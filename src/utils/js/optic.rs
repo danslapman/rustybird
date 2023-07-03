@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use serde_json::json;
 use serde_json::Value;
 
@@ -6,6 +7,16 @@ pub enum PathPart {
     Field(String),
     Index(usize),
     Traverse,
+}
+
+impl Display for PathPart {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathPart::Field(str) => write!(f, "{}", str),
+            PathPart::Index(idx) => write!(f, "[{}]", idx),
+            PathPart::Traverse => write!(f, "$")
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -31,6 +42,12 @@ impl JsonOptic {
     pub fn traverse(mut self) -> JsonOptic {
         self.json_path.push(PathPart::Traverse);
         self
+    }
+}
+
+impl Display for JsonOptic {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@->{}", self.json_path.iter().map(|part| part.to_string()).collect::<Vec<_>>().join("."))
     }
 }
 
