@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use serde_json::json;
 use serde_json::Value;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum PathPart {
     Field(String),
     Index(usize),
@@ -65,6 +65,7 @@ fn construct(part: &PathPart, value: Value) -> Value {
 
 trait ValueExt {
     fn set(&mut self, optic: &JsonOptic, v: &Value);
+    fn validate(&self, optic: &JsonOptic) -> bool;
 }
 
 impl ValueExt for Value {
@@ -79,11 +80,26 @@ impl ValueExt for Value {
 
         let _ = modify_fn(self);
     }
+
+    fn validate(&self, optic: &JsonOptic) -> bool {
+        if optic.json_path.iter().all(|el| *el == PathPart::Traverse) {self.is_array()}
+        else {
+            !optic.json_path.iter().fold(vec![self], |acc, el| acc.iter().filter(|j| j.verify(el)).flat_map(|j| {
+                match el {
+                    PathPart::Field(field_name) => j.field(field_name).into_iter().collect::<Vec<_>>(),
+                    PathPart::Index(index) => j.at_index(*index).into_iter().collect::<Vec<_>>(),
+                    PathPart::Traverse => j.as_array().map(|v| v.iter().collect::<Vec<_>>()).unwrap_or(vec![])
+                }
+            }).collect()).is_empty()
+        }
+    }
 }
 
 trait ValueExtInternal {
     fn modify_part_in_place(&mut self, part: &PathPart, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value);
     fn verify(&self, part: &PathPart) -> bool;
+    fn field(&self, field_name: &String) -> Option<&Value>;
+    fn at_index(&self, index: usize) -> Option<&Value>;
 }
 
 impl ValueExtInternal for Value {
@@ -141,6 +157,20 @@ impl ValueExtInternal for Value {
             PathPart::Traverse => self.is_array()
         }
     }
+
+    fn field(&self, field_name: &String) -> Option<&Value> {
+        match self {
+            Value::Object(map) => map.get(field_name),
+            _ => None
+        }
+    }
+
+    fn at_index(&self, index: usize) -> Option<&Value> {
+        match self {
+            Value::Array(vec) => vec.get(index),
+            _ => None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -176,5 +206,21 @@ mod optic_tests {
         target.set(&optic, &Value::from(42));
 
         assert_eq!(target, json!({"outer": {"inner": 42}, "a": {"b": "c"}}))
+    }
+
+    #[test]
+    fn validate_should_return_true_if_subtree_exists() {
+        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let target = json!({"outer": {"inner": 42}});
+
+        assert!(target.validate(&optic))
+    }
+
+    #[test]
+    fn validate_should_return_false_if_there_is_no_valid_subtree() {
+        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let target = json!({"outer": {"other": {"b": "c"}}});
+
+        assert!(!target.validate(&optic));
     }
 }
