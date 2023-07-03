@@ -65,6 +65,7 @@ fn construct(part: &PathPart, value: Value) -> Value {
 
 trait ValueExt {
     fn set(&mut self, optic: &JsonOptic, v: &Value);
+    fn set_opt(&mut self, optic: &JsonOptic, v: Option<&Value>);
     fn prune(&mut self, optic: &JsonOptic);
     fn validate(&self, optic: &JsonOptic) -> bool;
 }
@@ -80,6 +81,13 @@ impl ValueExt for Value {
         });
 
         let _ = modify_fn(self);
+    }
+
+    fn set_opt(&mut self, optic: &JsonOptic, v: Option<&Value>) {
+        match v {
+            Some(value) => self.set(optic, value),
+            None => self.prune(optic)
+        }
     }
 
     fn prune(&mut self, optic: &JsonOptic) {
