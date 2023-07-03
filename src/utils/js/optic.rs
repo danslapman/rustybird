@@ -65,6 +65,7 @@ fn construct(part: &PathPart, value: Value) -> Value {
 
 trait ValueExt {
     fn set(&mut self, optic: &JsonOptic, v: &Value);
+    fn prune(&mut self, optic: &JsonOptic);
     fn validate(&self, optic: &JsonOptic) -> bool;
 }
 
@@ -80,6 +81,25 @@ impl ValueExt for Value {
 
         let _ = modify_fn(self);
     }
+
+    fn prune(&mut self, optic: &JsonOptic) {
+        if self.validate(optic) {
+            let init: Box<dyn Fn(&mut Value)> = match &optic.json_path[optic.json_path.len() - 1] {
+                PathPart::Field(field_name) => Box::new(|v: &mut Value| v.remove_field(field_name)),
+                PathPart::Index(index) => Box::new(|v: &mut Value| v.remove_at_index(*index)),
+                PathPart::Traverse => Box::new(|v: &mut Value| if v.is_array() { *v = Value::Null })
+            };
+
+            let modify_fn = optic.json_path[0..(optic.json_path.len() - 1)].iter().rfold(init, |acc, el| {
+                Box::new(move |arg: &mut Value| {
+                    arg.modify_part_in_place(el, |v_ref| { acc(v_ref); ()}, || Value::Null)
+                })
+            });
+
+            let _ = modify_fn(self);
+        }
+    }
+
 
     fn validate(&self, optic: &JsonOptic) -> bool {
         if optic.json_path.iter().all(|el| *el == PathPart::Traverse) {self.is_array()}
@@ -100,6 +120,8 @@ trait ValueExtInternal {
     fn verify(&self, part: &PathPart) -> bool;
     fn field(&self, field_name: &String) -> Option<&Value>;
     fn at_index(&self, index: usize) -> Option<&Value>;
+    fn remove_field(&mut self, field_name: &String);
+    fn remove_at_index(&mut self, index: usize);
 }
 
 impl ValueExtInternal for Value {
@@ -171,6 +193,18 @@ impl ValueExtInternal for Value {
             _ => None
         }
     }
+
+    fn remove_field(&mut self, field_name: &String) {
+        if let Some(jmap) = self.as_object_mut() {
+            jmap.remove(field_name);
+        }
+    }
+
+    fn remove_at_index(&mut self, index: usize) {
+        if let Some(jarr) = self.as_array_mut() {
+            jarr.remove(index);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -206,6 +240,24 @@ mod optic_tests {
         target.set(&optic, &Value::from(42));
 
         assert_eq!(target, json!({"outer": {"inner": 42}, "a": {"b": "c"}}))
+    }
+
+    #[test]
+    fn prune_should_do_nothing_if_there_is_no_subtree() {
+        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let mut target = json!({"a": {"b": "c"}});
+
+        target.prune(&optic);
+        assert_eq!(target, json!({"a": {"b": "c"}}))
+    }
+
+    #[test]
+    fn prune_should_cut_only_redundant_part_of_subtree() {
+        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let mut target = json!({"outer": {"inner": 42, "other": {"b": "c"}}});
+
+        target.prune(&optic);
+        assert_eq!(target, json!({"outer": {"other": {"b": "c"}}}))
     }
 
     #[test]
