@@ -243,6 +243,46 @@ mod optic_tests {
     }
 
     #[test]
+    fn setter_should_keep_array_contents() {
+        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string()).index(2);
+        let mut target = json!({"outer": {"inner": [1, 2, 3]}});
+
+        target.set(&optic, &Value::from(4));
+        assert_eq!(target, json!({"outer": {"inner": [1, 2, 4]}}))
+    }
+
+    #[test]
+    fn setter_should_set_fields_inside_arrays() {
+        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string()).index(2).field("v".to_string());
+        let mut target = json!({"outer": {"inner": [{"v": 1}, {"v": 2}, {"v": 3}]}});
+
+        target.set(&optic, &Value::from(4));
+        assert_eq!(target, json!({"outer": {"inner": [{"v": 1}, {"v": 2}, {"v": 4}]}}))
+    }
+
+    #[test]
+    fn setter_should_write_at_correct_index() {
+        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string()).index(1);
+        let mut target = json!({"outer": {"inner": [42]}});
+
+        target.set(&optic, &Value::from(100));
+        assert_eq!(target, json!({"outer": {"inner": [42, 100]}}))
+    }
+
+    #[test]
+    fn setter_should_append_fields_inside_arrays() {
+        let optic1 = JsonOptic::empty().field("inner".to_string()).index(0).field("vv".to_string());
+        let mut target1 = json!({"inner": [{"v": 1}, {"v": 2}, {"v": 3}]});
+        target1.set(&optic1, &Value::from(4));
+        assert_eq!(target1, json!({"inner": [{"v": 1, "vv": 4}, {"v": 2}, {"v": 3}]}));
+
+        let optic2 = JsonOptic::empty().field("inner".to_string()).index(1).field("vv".to_string());
+        let mut target2 = json!({"inner": [{"v": 1}, {"v": 2}, {"v": 3}]});
+        target2.set(&optic2, &Value::from(4));
+        assert_eq!(target2, json!({"inner": [{"v": 1}, {"v": 2, "vv": 4}, {"v": 3}]}))
+    }
+
+    #[test]
     fn prune_should_do_nothing_if_there_is_no_subtree() {
         let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
         let mut target = json!({"a": {"b": "c"}});
