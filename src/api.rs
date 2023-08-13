@@ -2,6 +2,7 @@ use rocket::http::{Status, ContentType};
 use std::path::PathBuf;
 
 pub mod model;
+pub mod guards;
 
 #[get("/api/rustybird/exec/<path..>")]
 pub fn exec_get(path: PathBuf) -> (Status, (ContentType, String)) {
