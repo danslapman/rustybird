@@ -1,8 +1,9 @@
+use serde::{Serialize, Deserialize};
 use serde_json::json;
 use serde_json::Value;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PathPart {
     Field(String),
     Index(usize),
@@ -19,7 +20,7 @@ impl Display for PathPart {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct JsonOptic {
     json_path: Vec<PathPart>,
 }
