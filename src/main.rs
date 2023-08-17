@@ -7,5 +7,5 @@ pub mod utils;
 #[rocket::main]
 #[allow(unused_must_use)]
 async fn main() {
-    rocket::build().mount("/", routes![api::exec_get]).launch().await;
+    rocket::build().mount("/", routes![api::exec_get, api::exec_post]).launch().await;
 }
