@@ -2,6 +2,7 @@
 
 pub mod api;
 pub mod model;
+pub mod predicate_dsl;
 pub mod utils;
 
 //https://github.com/intellij-rust/intellij-rust/issues/5975
