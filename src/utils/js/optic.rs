@@ -1,9 +1,12 @@
-use serde::{Serialize, Deserialize};
+use once_cell::sync::Lazy;
+use regex::Regex;
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::de::{Error, Visitor};
 use serde_json::json;
 use serde_json::Value;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum PathPart {
     Field(String),
     Index(usize),
@@ -20,14 +23,37 @@ impl Display for PathPart {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct JsonOptic {
     json_path: Vec<PathPart>,
 }
 
+static INDEX_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[(\d+)\]").unwrap());
+
 impl JsonOptic {
     pub fn empty() -> JsonOptic {
         JsonOptic { json_path: vec![] }
+    }
+
+    pub fn from_path(path_str: &str) -> JsonOptic {
+        JsonOptic {
+            json_path: path_str.split('.').map(|s| match s {
+                "$" => PathPart::Traverse,
+                i if INDEX_PATTERN.is_match(i) => {
+                    if let Some(index_cap) = INDEX_PATTERN.captures(i) {
+                        let cap1 = &index_cap[1];
+                        if let Ok(idx) = cap1.parse::<usize>() {
+                            PathPart::Index(idx)
+                        } else {
+                            PathPart::Field(i.to_string())
+                        }
+                    } else {
+                        PathPart::Field(i.to_string())
+                    }
+                },
+                s => PathPart::Field(s.to_string())
+            }).collect::<Vec<_>>()
+        }
     }
 
     pub fn field(mut self, rhs: String) -> JsonOptic {
@@ -57,6 +83,32 @@ impl Display for JsonOptic {
                 .collect::<Vec<_>>()
                 .join(".")
         )
+    }
+}
+
+impl Serialize for JsonOptic {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_str(self.json_path.iter().map(|part| part.to_string()).collect::<Vec<_>>().join(".").as_str())
+    }
+}
+
+struct StrVisitor;
+
+impl <'de> Visitor<'de> for StrVisitor {
+    type Value = &'de str;
+
+    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        formatter.write_str("an str")
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E> where E: Error {
+        Ok(v)
+    }
+}
+
+impl <'de> Deserialize<'de> for JsonOptic {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        deserializer.deserialize_str(StrVisitor).map(|str| JsonOptic::from_path(str))
     }
 }
 
@@ -276,7 +328,7 @@ mod optic_tests {
 
     #[test]
     fn setter_should_create_fields_recursively_in_empty_json() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let mut target: Value = json!({});
 
         target.set(&optic, &Value::from(42));
@@ -286,7 +338,7 @@ mod optic_tests {
 
     #[test]
     fn setter_should_replace_existing_value() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let mut target: Value = json!({"outer": {"inner": 12}});
 
         target.set(&optic, &Value::from(42));
@@ -296,7 +348,7 @@ mod optic_tests {
 
     #[test]
     fn setter_should_keep_target_contents() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let mut target: Value = json!({"a": {"b": "c"}});
 
         target.set(&optic, &Value::from(42));
@@ -306,10 +358,7 @@ mod optic_tests {
 
     #[test]
     fn setter_should_keep_array_contents() {
-        let optic = JsonOptic::empty()
-            .field("outer".to_string())
-            .field("inner".to_string())
-            .index(2);
+        let optic = JsonOptic::from_path("outer.inner.[2]");
         let mut target = json!({"outer": {"inner": [1, 2, 3]}});
 
         target.set(&optic, &Value::from(4));
@@ -318,11 +367,7 @@ mod optic_tests {
 
     #[test]
     fn setter_should_set_fields_inside_arrays() {
-        let optic = JsonOptic::empty()
-            .field("outer".to_string())
-            .field("inner".to_string())
-            .index(2)
-            .field("v".to_string());
+        let optic = JsonOptic::from_path("outer.inner.[2].v");
         let mut target = json!({"outer": {"inner": [{"v": 1}, {"v": 2}, {"v": 3}]}});
 
         target.set(&optic, &Value::from(4));
@@ -331,10 +376,7 @@ mod optic_tests {
 
     #[test]
     fn setter_should_write_at_correct_index() {
-        let optic = JsonOptic::empty()
-            .field("outer".to_string())
-            .field("inner".to_string())
-            .index(1);
+        let optic = JsonOptic::from_path("outer.inner.[1]");
         let mut target = json!({"outer": {"inner": [42]}});
 
         target.set(&optic, &Value::from(100));
@@ -343,18 +385,12 @@ mod optic_tests {
 
     #[test]
     fn setter_should_append_fields_inside_arrays() {
-        let optic1 = JsonOptic::empty()
-            .field("inner".to_string())
-            .index(0)
-            .field("vv".to_string());
+        let optic1 = JsonOptic::from_path("inner.[0].vv");
         let mut target1 = json!({"inner": [{"v": 1}, {"v": 2}, {"v": 3}]});
         target1.set(&optic1, &Value::from(4));
         assert_eq!(target1, json!({"inner": [{"v": 1, "vv": 4}, {"v": 2}, {"v": 3}]}));
 
-        let optic2 = JsonOptic::empty()
-            .field("inner".to_string())
-            .index(1)
-            .field("vv".to_string());
+        let optic2 = JsonOptic::from_path("inner.[1].vv");
         let mut target2 = json!({"inner": [{"v": 1}, {"v": 2}, {"v": 3}]});
         target2.set(&optic2, &Value::from(4));
         assert_eq!(target2, json!({"inner": [{"v": 1}, {"v": 2, "vv": 4}, {"v": 3}]}))
@@ -362,7 +398,7 @@ mod optic_tests {
 
     #[test]
     fn getter_should_extract_json() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let target = json!({"outer": {"inner": {"a": {"b": "c"}}}});
 
         let result = target.get_all(&optic);
@@ -371,7 +407,7 @@ mod optic_tests {
 
     #[test]
     fn getter_should_return_empty_json_if_there_is_no_subtree() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let target = json!({"a": {"b": "c"}});
 
         let result = target.get_all(&optic);
@@ -380,7 +416,7 @@ mod optic_tests {
 
     #[test]
     fn prune_should_do_nothing_if_there_is_no_subtree() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let mut target = json!({"a": {"b": "c"}});
 
         target.prune(&optic);
@@ -389,7 +425,7 @@ mod optic_tests {
 
     #[test]
     fn prune_should_cut_only_redundant_part_of_subtree() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let mut target = json!({"outer": {"inner": 42, "other": {"b": "c"}}});
 
         target.prune(&optic);
@@ -398,7 +434,7 @@ mod optic_tests {
 
     #[test]
     fn validate_should_return_true_if_subtree_exists() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let target = json!({"outer": {"inner": 42}});
 
         assert!(target.validate(&optic))
@@ -406,7 +442,7 @@ mod optic_tests {
 
     #[test]
     fn validate_should_return_false_if_there_is_no_valid_subtree() {
-        let optic = JsonOptic::empty().field("outer".to_string()).field("inner".to_string());
+        let optic = JsonOptic::from_path("outer.inner");
         let target = json!({"outer": {"other": {"b": "c"}}});
 
         assert!(!target.validate(&optic));
