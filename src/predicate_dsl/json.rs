@@ -2,6 +2,7 @@ use crate::predicate_dsl::keyword::Keyword;
 use crate::utils::{IntoBD, IntoUSize};
 use crate::utils::js::optic::{JsonOptic, ValueExt};
 use regex::Regex;
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -57,6 +58,30 @@ impl JsonPredicate {
             (Keyword::AllIn, Value::Array(mandatory), Value::Array(vals)) => Ok(mandatory.iter().all(|mv| vals.contains(mv))),
             (k, v, _) => Err((k, v))
         }
+    }
+}
+
+impl Serialize for JsonPredicate {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        self.definition.serialize(serializer)
+    }
+}
+
+impl <'de> Deserialize<'de> for JsonPredicate {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        Spec::deserialize(deserializer).map(|spec| JsonPredicate { definition: spec })
+    }
+}
+
+fn validate_condition<'r>(kwd: &'r Keyword, etalon: &'r Value) -> bool {
+    match (kwd, etalon) {
+        (Keyword::Equals | Keyword::NotEq, _) => true,
+        (Keyword::Greater | Keyword::Gte | Keyword::Less | Keyword::Lte, Value::Number(_)) => true,
+        (Keyword::Rx, Value::String(rx)) if Regex::new(rx).is_ok() => true,
+        (Keyword::Size, Value::Number(_)) => true,
+        (Keyword::Exists, Value::Bool(_)) => true,
+        (Keyword::In | Keyword::NotIn | Keyword::AllIn, Value::Array(_)) => true,
+        (_, _) => false
     }
 }
 
