@@ -6,12 +6,12 @@ From-scratch re-implementation of [mockingbird](https://github.com/Tinkoff/mocki
 
 ## Why?
 
-- threat this an experiment
+- treat this an experiment
 - I'm not lead developer of mockingbird anymore (it least at this moment)
 
 ## Goals
 
-- full API compatibility
+- API format (not URL!) compatibility
 - feature-parity
 
 ## Non-goals
