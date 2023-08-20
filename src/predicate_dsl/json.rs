@@ -1,6 +1,6 @@
 use crate::predicate_dsl::keyword::Keyword;
 use crate::utils::{IntoBD, IntoUSize};
-use crate::utils::js::optic::JsonOptic;
+use crate::utils::js::optic::{JsonOptic, ValueExt};
 use regex::Regex;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -13,8 +13,25 @@ pub struct JsonPredicate {
 }
 
 impl JsonPredicate {
-    pub fn validate(&self, json: Value) -> bool {
-        false
+    pub fn validate(&self, json: Value) -> Result<bool, PredicateConstructionError<'_>> {
+        let mut result: Vec<Result<bool, Condition<'_>>> = vec![];
+
+        for (jo, conds) in self.definition.iter() {
+            let all_data = json.get_all(jo);
+            let data = all_data.first().unwrap_or(&&Value::Null);
+
+            for (kwd, etalon) in conds.iter() {
+                result.push(JsonPredicate::validate_one(kwd, etalon, *data));
+            }
+        }
+
+        let (oks, errs): (Vec<_>, Vec<_>) = result.into_iter().partition(|el| el.is_ok());
+
+        if errs.len() == 0 {
+            Ok(oks.into_iter().filter_map(|el| el.ok()).all(|el| el))
+        } else {
+            Err(PredicateConstructionError { problems: errs.into_iter().filter_map(|el| el.err()).collect() })
+        }
     }
 
     fn validate_one<'r>(kwd: &'r Keyword, etalon: &'r Value, value: &Value) -> Result<bool, Condition<'r>> {
@@ -41,4 +58,8 @@ impl JsonPredicate {
             (k, v, _) => Err((k, v))
         }
     }
+}
+
+pub struct PredicateConstructionError<'r> {
+    pub problems: Vec<Condition<'r>>
 }

@@ -72,7 +72,7 @@ fn construct(part: &PathPart, value: Value) -> Value {
     }
 }
 
-trait ValueExt {
+pub trait ValueExt {
     fn set(&mut self, optic: &JsonOptic, v: &Value);
     fn set_opt(&mut self, optic: &JsonOptic, v: Option<&Value>);
     fn prune(&mut self, optic: &JsonOptic);
