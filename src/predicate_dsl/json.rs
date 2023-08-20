@@ -16,7 +16,7 @@ pub struct JsonPredicate {
 
 impl JsonPredicate {
     pub fn validate(&self, json: Value) -> Result<bool, PredicateConstructionError<'_>> {
-        let mut result: Vec<Result<bool, Condition<'_>>> = vec![];
+        let mut result: Vec<Result<bool, ValidationError<'_>>> = vec![];
 
         for (jo, conds) in self.definition.iter() {
             let all_data = json.get_all(jo);
@@ -31,25 +31,38 @@ impl JsonPredicate {
 
         if errs.len() == 0 {
             Ok(oks.into_iter().filter_map(|el| el.ok()).all(|el| el))
+        } else if errs.iter().all(|err| err.as_ref().err().unwrap().is_data_error()) {
+            Ok(false)
         } else {
-            Err(PredicateConstructionError { problems: errs.into_iter().filter_map(|el| el.err()).collect() })
+            let condition_errors = errs.into_iter().filter_map(|el| el.err())
+                .filter_map(|err| match err {
+                    ValidationError::ConditionError { keyword, argument } => Some((keyword, argument)),
+                    _ => None
+                }).collect::<Vec<_>>();
+            Err(PredicateConstructionError { problems: condition_errors })
         }
     }
 
-    fn validate_one<'r>(kwd: &'r Keyword, etalon: &'r Value, value: &Value) -> Result<bool, Condition<'r>> {
+    fn validate_one<'r>(kwd: &'r Keyword, etalon: &'r Value, value: &Value) -> Result<bool, ValidationError<'r>> {
         match (kwd, etalon, value) {
             (Keyword::Equals, v_eq, val) => Ok(v_eq == val),
             (Keyword::NotEq, v_neq, val) => Ok(v_neq != val),
             (Keyword::Greater, Value::Number(l_b), Value::Number(nv)) => Ok(nv.to_big_decimal() > l_b.to_big_decimal()),
+            (Keyword::Greater, Value::Number(_), _) => Err(ValidationError::DataError),
             (Keyword::Gte, Value::Number(l_b), Value::Number(nv)) => Ok(nv.to_big_decimal() >= l_b.to_big_decimal()),
+            (Keyword::Gte, Value::Number(_), _) => Err(ValidationError::DataError),
             (Keyword::Less, Value::Number(u_b), Value::Number(nv)) => Ok(nv.to_big_decimal() < u_b.to_big_decimal()),
+            (Keyword::Less, Value::Number(_), _) => Err(ValidationError::DataError),
             (Keyword::Lte, Value::Number(u_b), Value::Number(nv)) => Ok(nv.to_big_decimal() <= u_b.to_big_decimal()),
+            (Keyword::Lte, Value::Number(_), _) => Err(ValidationError::DataError),
             (Keyword::Rx, Value::String(rx), Value::String(s)) => match Regex::new(rx) {
                 Ok(regex) => Ok(regex.is_match(s)),
-                _ => Err((kwd, etalon))
+                _ => Err(ValidationError::ConditionError {keyword: kwd, argument: etalon } )
             },
+            (Keyword::Rx, Value::String(rx), _) if Regex::new(rx).is_ok() => Err(ValidationError::DataError),
             (Keyword::Size, Value::Number(size), Value::String(s)) => Ok(s.len() == size.to_usize()),
             (Keyword::Size, Value::Number(size), Value::Array(v)) => Ok(v.len() == size.to_usize()),
+            (Keyword::Size, Value::Number(_), _) => Err(ValidationError::DataError),
             (Keyword::Exists, Value::Bool(true), val) => Ok(!val.is_null()),
             (Keyword::Exists, Value::Bool(false), val) => Ok(val.is_null()),
             (Keyword::In, Value::Array(possible), Value::Array(vals)) => Ok(possible.iter().any(|pv| vals.contains(pv))),
@@ -57,7 +70,8 @@ impl JsonPredicate {
             (Keyword::NotIn, Value::Array(impossible), Value::Array(vals)) => Ok(impossible.iter().all(|iv| !vals.contains(iv))),
             (Keyword::NotIn, Value::Array(impossible), val) => Ok(!impossible.contains(val)),
             (Keyword::AllIn, Value::Array(mandatory), Value::Array(vals)) => Ok(mandatory.iter().all(|mv| vals.contains(mv))),
-            (k, v, _) => Err((k, v))
+            (Keyword::AllIn, Value::Array(_), _) => Err(ValidationError::DataError),
+            (k, v, _) => Err(ValidationError::ConditionError {keyword: k, argument: v } )
         }
     }
 }
@@ -104,6 +118,23 @@ fn validate_condition<'r>(kwd: &'r Keyword, etalon: &'r Value) -> bool {
 
 pub struct PredicateConstructionError<'r> {
     pub problems: Vec<Condition<'r>>
+}
+
+enum ValidationError<'r> {
+    ConditionError {
+        keyword: &'r Keyword,
+        argument: &'r Value
+    },
+    DataError
+}
+
+impl ValidationError<'_> {
+    fn is_data_error(&self) -> bool {
+        match self {
+            ValidationError::DataError => true,
+            _ => false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -245,8 +276,8 @@ mod json_tests {
 
         assert!(!predicate.validate(json!({"f": "123"})).ok().unwrap());
         assert!(predicate.validate(json!({"f": "1234"})).ok().unwrap());
-        assert!(predicate.validate(json!({"f": 1234})).is_err());
-        assert!(!predicate.validate(json!({"f": "1234a"})).is_err());
+        assert!(!predicate.validate(json!({"f": 1234})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": "1234a"})).ok().unwrap()); //TODO: fix incomplete match
         assert!(predicate.validate(json!({"f": "12345"})).ok().unwrap());
     }
 
@@ -257,8 +288,8 @@ mod json_tests {
 
         assert!(predicate.validate(json!({"f": "1234"})).ok().unwrap());
         assert!(predicate.validate(json!({"f": [1, 2, 3, 4]})).ok().unwrap());
-        assert!(predicate.validate(json!({"f": 1234})).is_err());
-        assert!(predicate.validate(json!({"f": 4})).is_err());
+        assert!(!predicate.validate(json!({"f": 1234})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": 4})).ok().unwrap());
     }
 
     #[test]
