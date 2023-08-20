@@ -1,10 +1,9 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{Error, Visitor};
 use serde_json::json;
 use serde_json::Value;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum PathPart {
@@ -76,7 +75,21 @@ impl Display for JsonOptic {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "@->{}",
+            "{}",
+            self.json_path
+                .iter()
+                .map(|part| part.to_string())
+                .collect::<Vec<_>>()
+                .join(".")
+        )
+    }
+}
+
+impl Debug for JsonOptic {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
             self.json_path
                 .iter()
                 .map(|part| part.to_string())
@@ -92,23 +105,9 @@ impl Serialize for JsonOptic {
     }
 }
 
-struct StrVisitor;
-
-impl <'de> Visitor<'de> for StrVisitor {
-    type Value = &'de str;
-
-    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-        formatter.write_str("an str")
-    }
-
-    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E> where E: Error {
-        Ok(v)
-    }
-}
-
 impl <'de> Deserialize<'de> for JsonOptic {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        deserializer.deserialize_str(StrVisitor).map(|str| JsonOptic::from_path(str))
+        String::deserialize(deserializer).map(|str| JsonOptic::from_path(str.as_str()))
     }
 }
 
@@ -446,5 +445,13 @@ mod optic_tests {
         let target = json!({"outer": {"other": {"b": "c"}}});
 
         assert!(!target.validate(&optic));
+    }
+
+    #[test]
+    fn json_optic_correctly_deserializes() {
+        let optic = serde_json::from_value::<JsonOptic>(json!("outer.inner"));
+
+        assert!(optic.is_ok());
+        assert_eq!("outer.inner", optic.ok().unwrap().to_string())
     }
 }
