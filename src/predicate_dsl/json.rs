@@ -311,4 +311,54 @@ mod json_tests {
         assert!(predicate.validate(json!({"f": null})).ok().unwrap());
         assert!(predicate.validate(json!({})).ok().unwrap());
     }
+
+    #[test]
+    fn check_in() {
+        let json_spec: Value = json!({"f": {"[_]": ["1", 2, true]}});
+        let predicate = serde_json::from_value::<JsonPredicate>(json_spec).ok().unwrap();
+
+        assert!(predicate.validate(json!({"f": "1"})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": 2})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": true})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": "2"})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": 1})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": false})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": []})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": ["1"]})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": [2]})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": [true]})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": [1]})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": {}})).ok().unwrap());
+    }
+
+    #[test]
+    fn check_not_in() {
+        let json_spec: Value = json!({"f": {"![_]": ["1", 2, true]}});
+        let predicate = serde_json::from_value::<JsonPredicate>(json_spec).ok().unwrap();
+
+        assert!(!predicate.validate(json!({"f": "1"})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": 2})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": true})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": "2"})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": 1})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": false})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": []})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": ["1"]})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": [2]})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": [true]})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": [1]})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": {}})).ok().unwrap());
+    }
+
+    #[test]
+    fn check_all_in() {
+        let json_spec: Value = json!({"f": {"&[_]": ["1", 2, true]}});
+        let predicate = serde_json::from_value::<JsonPredicate>(json_spec).ok().unwrap();
+
+        assert!(!predicate.validate(json!({"f": 1})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": "1"})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": ["1", 2, true]})).ok().unwrap());
+        assert!(predicate.validate(json!({"f": [2, "1", true]})).ok().unwrap());
+        assert!(!predicate.validate(json!({"f": [2, "1", false]})).ok().unwrap());
+    }
 }
