@@ -1,4 +1,5 @@
-use actix_web::{App, HttpServer, Responder};
+use crate::api::resolver::StubResolver;
+use actix_web::{App, HttpServer};
 
 pub mod api;
 pub mod model;
@@ -11,6 +12,7 @@ pub mod utils;
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
+            .app_data(StubResolver {})
             .service(api::exec_get)
             .service(api::exec_post)
     })

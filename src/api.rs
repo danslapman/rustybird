@@ -5,7 +5,7 @@ pub mod model;
 pub mod resolver;
 
 #[derive(Deserialize)]
-struct PathInfo {
+pub struct PathInfo {
     path: String
 }
 
