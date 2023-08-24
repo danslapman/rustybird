@@ -4,6 +4,7 @@ use crate::api::guards::*;
 
 pub mod model;
 pub mod guards;
+pub mod resolver;
 
 #[get("/api/rustybird/exec/<path..>")]
 pub fn exec_get(path: PathBuf, headers: RequestHeaders<'_>, query: QueryParameters<'_>) -> (Status, (ContentType, String)) {
