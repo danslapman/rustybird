@@ -2,12 +2,12 @@
 
 ## What is this?
 
-From-scratch re-implementation of [mockingbird](https://github.com/Tinkoff/mockingbird)
+From-scratch re-implementation of [mockingbird](https://github.com/leviysoft/mockingbird)
 
 ## Why?
 
 - treat this an experiment
-- I'm not lead developer of mockingbird anymore (it least at this moment)
+- rustybird will use PostgreSQL instead of MongoDB
 
 ## Goals
 
