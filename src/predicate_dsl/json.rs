@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::Error;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 
 type Spec = HashMap<JsonOptic, HashMap<Keyword, Value>>;
 type Condition<'r> = (&'r Keyword, &'r Value);
@@ -101,6 +102,16 @@ impl <'de> Deserialize<'de> for JsonPredicate {
         } else {
             Ok(JsonPredicate { definition: spec })
         }
+    }
+}
+
+impl Debug for JsonPredicate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            serde_json::to_string(&self.definition).expect("Unserializable JsonPredicate!")
+        )
     }
 }
 

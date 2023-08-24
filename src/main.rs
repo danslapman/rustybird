@@ -4,6 +4,7 @@ use actix_web::{App, HttpServer};
 pub mod api;
 pub mod model;
 pub mod predicate_dsl;
+pub mod schema;
 pub mod utils;
 
 //https://github.com/intellij-rust/intellij-rust/issues/5975
