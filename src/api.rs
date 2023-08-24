@@ -1,21 +1,20 @@
-use rocket::http::{Status, ContentType};
-use std::path::PathBuf;
-use crate::api::guards::*;
+use actix_web::{get, post, web, HttpResponse, Responder};
+use serde::Deserialize;
 
 pub mod model;
-pub mod guards;
 pub mod resolver;
 
-#[get("/api/rustybird/exec/<path..>")]
-pub fn exec_get(path: PathBuf, headers: RequestHeaders<'_>, query: QueryParameters<'_>) -> (Status, (ContentType, String)) {
-    let path_str = path.into_os_string().into_string().unwrap();
-
-    (Status::Ok, (ContentType::Text, path_str))
+#[derive(Deserialize)]
+struct PathInfo {
+    path: String
 }
 
-#[post("/api/rustybird/exec/<path..>", data = "<body>")]
-pub fn exec_post(path: PathBuf, headers: RequestHeaders<'_>, query: QueryParameters<'_>, body: String) -> (Status, (ContentType, String)) {
-    let path_str = path.into_os_string().into_string().unwrap();
+#[get("/api/rustybird/exec/{path:.*}")]
+pub async fn exec_get(path: web::Path<PathInfo>) -> impl Responder {
+    HttpResponse::Ok().body(format!("{}", path.path))
+}
 
-    (Status::Ok, (ContentType::Text, format!("{} {}", path_str, body)))
+#[post("/api/rustybird/exec/{path:.*}")]
+pub async fn exec_post(path: web::Path<PathInfo>, body: String) -> impl Responder {
+    HttpResponse::Ok().body(format!("{} {}", path.path, body))
 }

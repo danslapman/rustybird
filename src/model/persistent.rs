@@ -1,5 +1,4 @@
-use crate::model::Scope;
-use rocket::http::Method;
+use crate::model::*;
 use serde_json::Value;
 use std::time::Instant;
 
@@ -45,7 +44,7 @@ pub struct HttpStub {
     times: Option<u64>,
     service_suffix: String,
     name: String,
-    method: Method,
+    method: HttpMethod,
     path: Option<String>,
     path_pattern: Option<String>,
     seed: Option<Value>

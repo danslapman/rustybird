@@ -1,7 +1,6 @@
 use crate::model::*;
 use crate::utils::js::optic::JsonOptic;
 use regex::Regex;
-use rocket::http::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -32,7 +31,7 @@ pub struct CreateStubRequest {
     scope: Scope,
     times: Option<i64>,
     name: String,
-    method: Method,
+    method: HttpMethod,
     path: Option<String>,
     path_pattern: Option<Regex>,
     state: Option<HashMap<JsonOptic, HashMap<String, HashMap<String, Value>>>>,
