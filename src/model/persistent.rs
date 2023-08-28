@@ -63,11 +63,11 @@ final case class HttpStub(
 pub struct HttpStub {
     pub id: i32,
     pub created: DateTime<Utc>,
-    //pub scope: Scope,
+    pub scope: Scope,
     pub times: Option<i64>,
     pub service_suffix: String,
     pub name: String,
-    //pub method: HttpMethod,
+    pub method: HttpMethod,
     pub path: Option<String>,
     pub path_pattern: Option<String>,
     pub seed: Option<Value>,
