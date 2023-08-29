@@ -1,41 +1,21 @@
 use crate::model::*;
 use crate::utils::js::optic::JsonOptic;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::time::Duration;
 
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "mode")]
-pub enum HttpStubRequest {
-    Json {
-        headers: HashMap<String, String>,
-        query: HashMap<JsonOptic, HashMap<String, Value>>,
-        body: Value
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "mode")]
-pub enum HttpStubResponse {
-    Raw {
-        code: i64,
-        headers: HashMap<String, String>,
-        body: String,
-        delay: Option<Duration>
-    }
-}
-
+#[derive(Deserialize)]
 pub struct CreateStubRequest {
-    scope: Scope,
-    times: Option<i64>,
-    name: String,
-    method: HttpMethod,
-    path: Option<String>,
-    path_pattern: Option<Regex>,
-    state: Option<HashMap<JsonOptic, HashMap<String, HashMap<String, Value>>>>,
-    request: HttpStubRequest,
-    persist: Option<HashMap<JsonOptic, Value>>,
-    response: HttpStubResponse
+    pub scope: Scope,
+    pub times: Option<u32>,
+    pub name: String,
+    pub method: HttpMethod,
+    pub path: Option<String>,
+    #[serde(with = "serde_regex")]
+    pub path_pattern: Option<Regex>,
+    pub state: Option<HashMap<JsonOptic, HashMap<String, HashMap<String, Value>>>>,
+    pub request: persistent::HttpStubRequest,
+    pub persist: Option<HashMap<JsonOptic, Value>>,
+    pub response: persistent::HttpStubResponse
 }
