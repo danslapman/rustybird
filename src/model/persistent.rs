@@ -4,6 +4,7 @@ use crate::predicate_dsl::keyword::Keyword;
 use crate::utils::js::optic::JsonOptic;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
+use diesel_autoincrement_new_struct::prelude::*;
 use diesel_json::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -57,6 +58,7 @@ final case class HttpStub(
 )
  */
 
+#[apply(NewInsertable!)]
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::stub)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
