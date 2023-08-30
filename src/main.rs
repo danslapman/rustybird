@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(admin_api_handler.clone()))
             .service(api::exec_get)
             .service(api::exec_post)
+            .service(api::create_stub)
     })
         .bind(("127.0.0.1", 8080))?
         .run()
