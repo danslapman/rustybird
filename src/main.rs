@@ -12,6 +12,7 @@ extern crate diesel_autoincrement_new_struct;
 
 pub mod api;
 pub mod dal;
+pub mod error;
 pub mod model;
 pub mod predicate_dsl;
 pub mod schema;

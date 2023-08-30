@@ -1,4 +1,5 @@
 use crate::model::*;
+use crate::predicate_dsl::keyword::Keyword;
 use crate::utils::js::optic::JsonOptic;
 use regex::Regex;
 use serde::{Deserialize};
@@ -14,7 +15,7 @@ pub struct CreateStubRequest {
     pub path: Option<String>,
     #[serde(with = "serde_regex")]
     pub path_pattern: Option<Regex>,
-    pub state: Option<HashMap<JsonOptic, HashMap<String, HashMap<String, Value>>>>,
+    pub state: Option<HashMap<JsonOptic, HashMap<Keyword, Value>>>,
     pub request: persistent::HttpStubRequest,
     pub persist: Option<HashMap<JsonOptic, Value>>,
     pub response: persistent::HttpStubResponse
