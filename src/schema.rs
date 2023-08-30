@@ -11,6 +11,14 @@ pub mod sql_types {
 }
 
 diesel::table! {
+    state (id) {
+        id -> Int4,
+        created -> Timestamptz,
+        data -> Jsonb,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::Scope;
     use super::sql_types::HttpMethod;
@@ -37,3 +45,8 @@ diesel::table! {
         callback -> Nullable<Jsonb>,
     }
 }
+
+diesel::allow_tables_to_appear_in_same_query!(
+    state,
+    stub,
+);

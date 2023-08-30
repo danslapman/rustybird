@@ -1,0 +1,5 @@
+CREATE TABLE state (
+    id SERIAL PRIMARY KEY,
+    created TIMESTAMPTZ NOT NULL,
+    data JSONB NOT NULL
+);

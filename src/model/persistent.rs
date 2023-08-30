@@ -135,3 +135,13 @@ pub enum Callback {
         delay: Option<Duration>
     }
 }
+
+#[apply(NewInsertable!)]
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::state)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct State {
+    pub id: i32,
+    pub created: DateTime<Utc>,
+    pub data: Value
+}
