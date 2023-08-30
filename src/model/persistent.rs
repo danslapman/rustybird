@@ -51,6 +51,7 @@ pub enum HttpStubResponse {
         code: u16,
         headers: HashMap<String, String>,
         body: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
         delay: Option<Duration>
     },
     #[serde(rename = "json")]
@@ -58,19 +59,11 @@ pub enum HttpStubResponse {
         code: u16,
         headers: HashMap<String, String>,
         body: Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
         delay: Option<Duration>,
         is_template: bool
     }
 }
-
-
-/*
-final case class HttpStub(
-    ...
-    callback: Option[Callback],
-    labels: Seq[String] = Seq.empty
-)
- */
 
 #[apply(NewInsertable!)]
 #[derive(Queryable, Selectable)]
@@ -90,5 +83,55 @@ pub struct HttpStub {
     pub state: Option<Json<HashMap<JsonOptic, HashMap<Keyword, Value>>>>,
     pub request: Json<HttpStubRequest>,
     pub persist: Option<Json<HashMap<JsonOptic, Value>>>,
-    pub response: Json<HttpStubResponse>
+    pub response: Json<HttpStubResponse>,
+    pub callback: Option<Json<Callback>>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum CallbackResponseMode {
+    Json
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "mode")]
+pub enum CallbackRequest {
+    #[serde(rename = "no_body")]
+    CallbackRequestWithoutBody {
+        url: String,
+        method: HttpMethod,
+        headers: HashMap<String, String>
+    },
+    #[serde(rename = "raw")]
+    RawCallbackRequest {
+        url: String,
+        method: HttpMethod,
+        headers: HashMap<String, String>,
+        body: String
+    },
+    #[serde(rename = "json")]
+    JsonCallbackRequest {
+        url: String,
+        method: HttpMethod,
+        headers: HashMap<String, String>,
+        body: Value
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Callback {
+    HttpCallback {
+        request: CallbackRequest,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        response_mode: Option<CallbackResponseMode>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        persist: Option<HashMap<JsonOptic, Value>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        callback: Option<Box<Callback>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        delay: Option<Duration>
+    }
 }
