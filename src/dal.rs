@@ -54,4 +54,16 @@ impl StateDao {
 
         Ok(res)
     }
+
+    pub async fn find_by_spec(&self, spec: i32) -> Result<Vec<State>, Error> {
+        use crate::schema::state::dsl::*;
+
+        let mut conn = self.pool.get()?;
+
+        //let result = state
+            //.filter(data.retrieve_by_path_as_text())
+
+
+        Ok(vec![])
+    }
 }
