@@ -5,6 +5,7 @@ use crate::model::persistent;
 use chrono::Utc;
 use diesel_json::Json;
 
+#[derive(Clone)]
 pub struct AdminApiHandler {
     stub_dao: StubDao
 }
