@@ -16,5 +16,6 @@ CREATE TABLE stub (
   state JSONB NULL,
   request JSONB NOT NULL,
   persist JSONB NULL,
-  response JSONB NOT NULL
+  response JSONB NOT NULL,
+  callback JSONB NULL
 )

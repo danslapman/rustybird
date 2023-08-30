@@ -23,5 +23,6 @@ pub struct CreateStubRequest {
     pub request: persistent::HttpStubRequest,
     #[serde(default)]
     pub persist: Option<HashMap<JsonOptic, Value>>,
-    pub response: persistent::HttpStubResponse
+    pub response: persistent::HttpStubResponse,
+    pub callback: Option<persistent::Callback>
 }

@@ -30,6 +30,7 @@ impl AdminApiHandler {
             request: Json::new(req_stub.request),
             persist: None,
             response: Json::new(req_stub.response),
+            callback: req_stub.callback.map(|c| Json::new(c))
         };
 
         self.stub_dao.insert_stub(new_stub).await.map(|res| res > 0)

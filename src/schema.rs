@@ -34,5 +34,6 @@ diesel::table! {
         request -> Jsonb,
         persist -> Nullable<Jsonb>,
         response -> Jsonb,
+        callback -> Nullable<Jsonb>,
     }
 }
