@@ -1,4 +1,5 @@
 use crate::api::model::*;
+use crate::api::admin::AdminApiHandler;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use serde::Deserialize;
 
@@ -24,6 +25,9 @@ pub async fn exec_post(path: web::Path<PathInfo>, body: String) -> impl Responde
 // ******************** Admin API ********************
 
 #[post("/api/internal/rustybird/stub")]
-pub async fn create_stub(req: web::Json<CreateStubRequest>) -> impl Responder {
-    HttpResponse::Ok()
+pub async fn create_stub(req: web::Json<CreateStubRequest>, handler: web::Data<AdminApiHandler>) -> impl Responder {
+    match handler.create_stub(req.into_inner()).await {
+        Ok(_) => HttpResponse::Ok(),
+        Err(_) => HttpResponse::UnprocessableEntity()
+    }
 }

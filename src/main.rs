@@ -1,4 +1,4 @@
-use crate::api::resolver::StubResolver;
+use crate::api::admin::AdminApiHandler;
 use crate::dal::*;
 use actix_web::{App, HttpServer, web};
 use diesel::PgConnection;
@@ -29,10 +29,13 @@ async fn main() -> std::io::Result<()> {
         .build(manager)
         .expect("Could not build connection pool");
 
+    let stub_dao = StubDao::new(pool.clone());
+
+    let admin_api_handler = AdminApiHandler::new(stub_dao);
+
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(StubDao::new(pool.clone())))
-            .app_data(StubResolver {})
+            .app_data(web::Data::new(admin_api_handler.clone()))
             .service(api::exec_get)
             .service(api::exec_post)
     })
