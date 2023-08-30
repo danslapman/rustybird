@@ -6,6 +6,7 @@ pub mod persistent;
 #[derive(Debug, diesel_derive_enum::DbEnum)]
 #[ExistingTypePath = "crate::schema::sql_types::Scope"]
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Scope {
     Persistent,
     Ephemeral,
@@ -15,6 +16,7 @@ pub enum Scope {
 #[derive(Debug, diesel_derive_enum::DbEnum)]
 #[ExistingTypePath = "crate::schema::sql_types::HttpMethod"]
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {
     Get,
     Post,

@@ -14,18 +14,30 @@ use std::time::Duration;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "mode")]
 pub enum HttpStubRequest {
+    #[serde(rename = "no_body")]
+    RequestWithoutBody {
+        headers: HashMap<String, String>,
+        #[serde(default = "HashMap::new")]
+        query: HashMap<JsonOptic, HashMap<Keyword, Value>>
+    },
+    #[serde(rename = "json")]
     JsonRequest {
         headers: HashMap<String, String>,
+        #[serde(default = "HashMap::new")]
         query: HashMap<JsonOptic, HashMap<Keyword, Value>>,
         body: Value
     },
+    #[serde(rename = "raw")]
     RawRequest {
         headers: HashMap<String, String>,
+        #[serde(default = "HashMap::new")]
         query: HashMap<JsonOptic, HashMap<Keyword, Value>>,
         body: String
     },
+    #[serde(rename = "jlens")]
     JLensRequest {
         headers: HashMap<String, String>,
+        #[serde(default = "HashMap::new")]
         query: HashMap<JsonOptic, HashMap<Keyword, Value>>,
         body: JsonPredicate
     }
@@ -34,12 +46,14 @@ pub enum HttpStubRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "mode")]
 pub enum HttpStubResponse {
+    #[serde(rename = "raw")]
     RawResponse {
         code: u16,
         headers: HashMap<String, String>,
         body: String,
         delay: Option<Duration>
     },
+    #[serde(rename = "json")]
     JsonResponse {
         code: u16,
         headers: HashMap<String, String>,
