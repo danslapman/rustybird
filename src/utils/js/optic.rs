@@ -69,6 +69,23 @@ impl JsonOptic {
         self.json_path.push(PathPart::Traverse);
         self
     }
+
+    /// Renders JsonOptic into a JsonPath-compatible representation
+    pub fn to_json_path_string(&self) -> String {
+        format!(
+            "$.{}",
+            self.json_path
+                .iter()
+                .map(|part| match part {
+                    PathPart::Field(f) => format!("{}", f),
+                    PathPart::Index(i) => format!("[{}]", i),
+                    PathPart::Traverse => "[*]".to_string()
+                })
+                .collect::<Vec<_>>()
+                .join(".")
+                .replace(".[", "[")
+        )
+    }
 }
 
 impl Display for JsonOptic {
@@ -453,5 +470,14 @@ mod optic_tests {
 
         assert!(optic.is_ok());
         assert_eq!("outer.inner", optic.ok().unwrap().to_string())
+    }
+
+    #[test]
+    fn json_optic_corretly_renders_into_jsonpath() {
+        let optic1 = serde_json::from_value::<JsonOptic>(json!("track.segments.[0].location")).ok().unwrap();
+        let optic2 = serde_json::from_value::<JsonOptic>(json!("track.segments.$.location")).ok().unwrap();
+
+        assert_eq!(optic1.to_json_path_string(), "$.track.segments[0].location");
+        assert_eq!(optic2.to_json_path_string(), "$.track.segments[*].location");
     }
 }

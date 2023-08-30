@@ -7,6 +7,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use serde_json::Value;
 
 pub mod error;
+pub mod sql_json;
 
 #[derive(Clone)]
 pub struct StubDao {
