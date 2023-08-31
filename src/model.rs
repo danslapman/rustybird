@@ -2,6 +2,7 @@ use diesel_derive_enum;
 use serde::{Deserialize, Serialize};
 
 pub mod persistent;
+pub mod sql_json;
 
 #[derive(Debug, diesel_derive_enum::DbEnum)]
 #[ExistingTypePath = "crate::schema::sql_types::Scope"]

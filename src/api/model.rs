@@ -1,5 +1,5 @@
 use crate::model::*;
-use crate::predicate_dsl::keyword::Keyword;
+use crate::model::sql_json::Keyword as JsonKeyword;
 use crate::utils::js::optic::JsonOptic;
 use regex::Regex;
 use serde::{Deserialize};
@@ -19,7 +19,7 @@ pub struct CreateStubRequest {
     #[serde(default)]
     pub path_pattern: Option<Regex>,
     #[serde(default)]
-    pub state: Option<HashMap<JsonOptic, HashMap<Keyword, Value>>>,
+    pub state: Option<HashMap<JsonOptic, HashMap<JsonKeyword, Value>>>,
     pub request: persistent::HttpStubRequest,
     #[serde(default)]
     pub persist: Option<HashMap<JsonOptic, Value>>,
