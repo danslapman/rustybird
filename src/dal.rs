@@ -1,13 +1,18 @@
+use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, StateSpec};
 use crate::error::Error;
 use crate::model::persistent::*;
+use crate::model::sql_json::{Keyword as SqlKeyword};
+use crate::utils::js::Jsn;
+use crate::utils::js::optic::JsonOptic;
 use chrono::Utc;
 use diesel::prelude::*;
 use diesel::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 use serde_json::Value;
+use std::collections::HashMap;
 
 pub mod error;
-pub mod sql_json;
+pub mod jsonb;
 
 #[derive(Clone)]
 pub struct StubDao {
@@ -56,15 +61,23 @@ impl StateDao {
         Ok(res)
     }
 
-    pub async fn find_by_spec(&self, spec: i32) -> Result<Vec<State>, Error> {
+    pub async fn find_by_spec(&self, spec: HashMap<JsonOptic, HashMap<SqlKeyword, Value>>) -> Result<Vec<State>, Error> {
         use crate::schema::state::dsl::*;
 
         let mut conn = self.pool.get()?;
 
-        //let result = state
-            //.filter(data.retrieve_by_path_as_text())
+        let jsn_spec = StateSpec::from(
+            spec.into_iter()
+                .map(|(k, v)| (k, v.into_iter()
+                    .map(|(kx, vx)| (kx, Into::<Jsn>::into(vx)))
+                    .collect::<HashMap<_, _>>()))
+                .collect::<HashMap<_, _>>()
+        );
 
+        let res = state
+            .filter(data.exists((&jsn_spec).into_sql::<JsonPath>()))
+            .load(&mut conn)?;
 
-        Ok(vec![])
+        Ok(res)
     }
 }
