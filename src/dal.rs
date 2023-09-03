@@ -2,7 +2,6 @@ use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, StateSpec};
 use crate::error::Error;
 use crate::model::persistent::*;
 use crate::model::sql_json::{Keyword as SqlKeyword};
-use crate::utils::js::Jsn;
 use crate::utils::js::optic::JsonOptic;
 use chrono::Utc;
 use diesel::prelude::*;
@@ -66,13 +65,7 @@ impl StateDao {
 
         let mut conn = self.pool.get()?;
 
-        let jsn_spec = StateSpec::from(
-            spec.into_iter()
-                .map(|(k, v)| (k, v.into_iter()
-                    .map(|(kx, vx)| (kx, Into::<Jsn>::into(vx)))
-                    .collect::<HashMap<_, _>>()))
-                .collect::<HashMap<_, _>>()
-        );
+        let jsn_spec = StateSpec::from(spec);
 
         let res = state
             .filter(data.exists((&jsn_spec).into_sql::<JsonPath>()))

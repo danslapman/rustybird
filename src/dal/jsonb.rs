@@ -9,6 +9,7 @@ use diesel::query_builder::{AstPass, QueryFragment, QueryId};
 use diesel::result::Error as DieselError;
 use diesel::serialize::{Output, ToSql};
 use diesel::sql_types::{Bool, BigInt, Jsonb, Text};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
@@ -47,8 +48,12 @@ impl<T: Expression<SqlType = Jsonb>> JsonbQueryMethods for T {}
 pub struct StateSpec(HashMap<JsonOptic, HashMap<SqlKeyword, Jsn>>);
 
 impl StateSpec {
-    pub fn from(spec: HashMap<JsonOptic, HashMap<SqlKeyword, Jsn>>) -> StateSpec {
-        StateSpec(spec)
+    pub fn from(spec: HashMap<JsonOptic, HashMap<SqlKeyword, Value>>) -> StateSpec {
+        StateSpec(spec.into_iter()
+            .map(|(k, v)| (k, v.into_iter()
+                .map(|(kx, vx)| (kx, Into::<Jsn>::into(vx)))
+                .collect::<HashMap<_, _>>()))
+            .collect::<HashMap<_, _>>())
     }
 }
 
@@ -86,6 +91,7 @@ fn push_json_value<'a, 'b>(mut pass: AstPass<'a, 'b, Pg>, json_value: &'b Jsn) -
 impl QueryFragment<Pg> for StateSpec {
     fn walk_ast<'b>(&'b self, mut pass: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
         for (optic, cond) in &self.0 {
+            pass.push_sql("'");
             pass.push_sql(optic.to_json_path_string().as_str());
 
             for (kwd, val) in cond {
@@ -109,8 +115,29 @@ impl QueryFragment<Pg> for StateSpec {
                     SqlKeyword::Exists => {}
                 }
             }
+            pass.push_sql("'");
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod jsonb_tests {
+    use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, StateSpec};
+    use crate::model::sql_json::Keyword;
+    use crate::schema::state::dsl::*;
+    use crate::utils::js::optic::JsonOptic;
+    use diesel::prelude::*;
+    use diesel::pg::Pg;
+    use diesel::query_builder::debug_query;
+    use serde_json::{json, Value};
+    use std::collections::HashMap;
+
+    #[test]
+    fn check_equals_spec_sql() {
+        let spec = serde_json::from_value::<HashMap<JsonOptic, HashMap<Keyword, Value>>>(json!({"a.b": {"==": 42}})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&StateSpec::from(spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @@ '$.a.b ?(@ == $1)' -- binds: [42]"#)
     }
 }
