@@ -17,6 +17,7 @@ use std::fmt::{Debug, Formatter};
 #[diesel(postgres_type(oid = 4072, array_oid = 4073))]
 pub struct JsonPath(&'static str);
 
+diesel::infix_operator!(Exists, " @? ", backend: Pg);
 diesel::infix_operator!(Matches, " @@ ", backend: Pg);
 
 impl ToSql<Text, Pg> for JsonPath
@@ -37,7 +38,11 @@ pub trait JsonbQueryMethods
     where
         Self: Expression<SqlType = Jsonb> + Sized
 {
-    fn exists<T: AsExpression<JsonPath>>(self, other: T) -> Matches<Self, T::Expression> {
+    fn exists<T: AsExpression<JsonPath>>(self, other: T) -> Exists<Self, T::Expression> {
+        Exists::new(self, other.as_expression())
+    }
+
+    fn matches<T: AsExpression<JsonPath>>(self, other: T) -> Matches<Self, T::Expression> {
         Matches::new(self, other.as_expression())
     }
 }
@@ -87,13 +92,54 @@ impl QueryFragment<Pg> for Predicate {
                     pass = push_json_value(pass, val)?;
                     pass.push_sql(")");
                 }
-                SqlKeyword::Less => {}
-                SqlKeyword::Lte => {}
-                SqlKeyword::Greater => {}
-                SqlKeyword::Gte => {}
-                SqlKeyword::Like => {}
-                SqlKeyword::StartsWith => {}
-                SqlKeyword::Exists => {}
+                SqlKeyword::Less => {
+                    pass.push_sql(" ?(@ < ");
+                    match val {
+                        Jsn::Signed(_) | Jsn::Unsigned(_) | Jsn::Float(_) => pass = push_json_value(pass, val)?,
+                        _ => return Err(query_builder_error("Incorrect argument for '<'"))
+                    }
+                    pass.push_sql(")");
+                }
+                SqlKeyword::Lte => {
+                    pass.push_sql(" ?(@ <= ");
+                    match val {
+                        Jsn::Signed(_) | Jsn::Unsigned(_) | Jsn::Float(_) => pass = push_json_value(pass, val)?,
+                        _ => return Err(query_builder_error("Incorrect argument for '<='"))
+                    }
+                    pass.push_sql(")");
+                }
+                SqlKeyword::Greater => {
+                    pass.push_sql(" ?(@ > ");
+                    match val {
+                        Jsn::Signed(_) | Jsn::Unsigned(_) | Jsn::Float(_) => pass = push_json_value(pass, val)?,
+                        _ => return Err(query_builder_error("Incorrect argument for '>'"))
+                    }
+                    pass.push_sql(")");
+                }
+                SqlKeyword::Gte => {
+                    pass.push_sql(" ?(@ >= ");
+                    match val {
+                        Jsn::Signed(_) | Jsn::Unsigned(_) | Jsn::Float(_) => pass = push_json_value(pass, val)?,
+                        _ => return Err(query_builder_error("Incorrect argument for '>='"))
+                    }
+                    pass.push_sql(")");
+                }
+                SqlKeyword::Like => {
+                    pass.push_sql(" ?(@ like_regex ");
+                    match val {
+                        Jsn::String(_) => pass = push_json_value(pass, val)?,
+                        _ => return Err(query_builder_error("Incorrect argument for 'like_regex'"))
+                    }
+                    pass.push_sql(")");
+                }
+                SqlKeyword::StartsWith => {
+                    pass.push_sql(" ?(@ starts with ");
+                    match val {
+                        Jsn::String(_) => pass = push_json_value(pass, val)?,
+                        _ => return Err(query_builder_error("Incorrect argument for 'starts with'"))
+                    }
+                    pass.push_sql(")");
+                }
             }
         }
         pass.push_sql("'");
@@ -135,6 +181,6 @@ mod jsonb_tests {
         let optic = JsonOptic::from_path("a.b");
         let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({"==": 42})).ok().unwrap();
         let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
-        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @@ '$.a.b ?(@ == $1)' -- binds: [42]"#)
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ == $1)' -- binds: [42]"#)
     }
 }
