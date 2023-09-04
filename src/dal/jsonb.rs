@@ -183,4 +183,60 @@ mod jsonb_tests {
         let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
         assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ == $1)' -- binds: [42]"#)
     }
+
+    #[test]
+    fn check_not_equals_spec_sql() {
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({"!=": 42})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ != $1)' -- binds: [42]"#)
+    }
+
+    #[test]
+    fn check_gt_spec_sql() {
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({">": 42})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ > $1)' -- binds: [42]"#)
+    }
+
+    #[test]
+    fn check_gte_spec_sql() {
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({">=": 42})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ >= $1)' -- binds: [42]"#)
+    }
+
+    #[test]
+    fn check_lt_spec_sql() {
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({"<": 42})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ < $1)' -- binds: [42]"#)
+    }
+
+    #[test]
+    fn check_lte_spec_sql() {
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({"<=": 42})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ <= $1)' -- binds: [42]"#)
+    }
+
+    #[test]
+    fn check_like_regex_spec_sql() {
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({"~=": "test"})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ like_regex $1)' -- binds: ["test"]"#)
+    }
+
+    #[test]
+    fn check_starts_with_spec_sql() {
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({"^": "test"})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
+        assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @? '$.a.b ?(@ starts with $1)' -- binds: ["test"]"#)
+    }
 }
