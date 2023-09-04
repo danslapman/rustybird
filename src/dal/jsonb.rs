@@ -124,7 +124,7 @@ impl QueryFragment<Pg> for Predicate {
                     }
                     pass.push_sql(")");
                 }
-                SqlKeyword::Like => {
+                SqlKeyword::Rx => {
                     pass.push_sql(" ?(@ like_regex ");
                     match val {
                         Jsn::String(_) => pass = push_json_value(pass, val)?,

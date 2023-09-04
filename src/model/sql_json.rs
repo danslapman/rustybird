@@ -15,7 +15,7 @@ pub enum Keyword {
     #[serde(rename = ">=")]
     Gte,
     #[serde(rename = "~=")]
-    Like,
+    Rx,
     #[serde(rename = "^")]
     StartsWith
 }
