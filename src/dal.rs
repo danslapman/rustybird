@@ -1,4 +1,4 @@
-use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, StateSpec};
+use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, Predicate};
 use crate::error::Error;
 use crate::model::persistent::*;
 use crate::model::sql_json::{Keyword as SqlKeyword};
@@ -65,11 +65,15 @@ impl StateDao {
 
         let mut conn = self.pool.get()?;
 
-        let jsn_spec = StateSpec::from(spec);
+        let mut query = state.into_boxed();
 
-        let res = state
-            .filter(data.exists((&jsn_spec).into_sql::<JsonPath>()))
-            .load(&mut conn)?;
+        let predicates = spec.into_iter().map(|(optic, spec)| Predicate::from(optic, spec)).collect::<Vec<_>>();
+
+        for pred in predicates {
+            query = query.filter(data.exists(pred.into_sql::<JsonPath>()));
+        }
+
+        let res = query.load(&mut conn)?;
 
         Ok(res)
     }
