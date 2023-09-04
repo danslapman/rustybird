@@ -17,7 +17,5 @@ pub enum Keyword {
     #[serde(rename = "~=")]
     Like,
     #[serde(rename = "^")]
-    StartsWith,
-    #[serde(rename = "exists")]
-    Exists
+    StartsWith
 }
