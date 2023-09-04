@@ -45,32 +45,62 @@ pub trait JsonbQueryMethods
 impl<T: Expression<SqlType = Jsonb>> JsonbQueryMethods for T {}
 
 #[derive(Debug)]
-pub struct StateSpec(HashMap<JsonOptic, HashMap<SqlKeyword, Jsn>>);
+pub struct Predicate(JsonOptic, HashMap<SqlKeyword, Jsn>);
 
-impl StateSpec {
-    pub fn from(spec: HashMap<JsonOptic, HashMap<SqlKeyword, Value>>) -> StateSpec {
-        StateSpec(spec.into_iter()
-            .map(|(k, v)| (k, v.into_iter()
-                .map(|(kx, vx)| (kx, Into::<Jsn>::into(vx)))
-                .collect::<HashMap<_, _>>()))
+impl Predicate {
+    pub fn from(optic: JsonOptic, spec: HashMap<SqlKeyword, Value>) -> Predicate {
+        Predicate(optic, spec.into_iter()
+            .map(|(kx, vx)| (kx, Into::<Jsn>::into(vx)))
             .collect::<HashMap<_, _>>())
     }
 }
 
-impl QueryId for StateSpec {
+impl QueryId for Predicate {
     type QueryId = ();
     const HAS_STATIC_QUERY_ID: bool = false;
 }
 
-impl Expression for StateSpec {
+impl Expression for Predicate {
     type SqlType = JsonPath;
 }
 
-impl<GB> ValidGrouping<GB> for StateSpec {
+impl<GB> ValidGrouping<GB> for Predicate {
     type IsAggregate = is_aggregate::Never;
 }
 
-impl<QS> AppearsOnTable<QS> for StateSpec where Self: Expression {}
+impl<QS> AppearsOnTable<QS> for Predicate where Self: Expression {}
+
+impl QueryFragment<Pg> for Predicate {
+    fn walk_ast<'b>(&'b self, mut pass: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
+        pass.push_sql("'");
+        pass.push_sql(self.0.to_json_path_string().as_str());
+
+        for (kwd, val) in self.1.iter() {
+            match kwd {
+                SqlKeyword::Eq => {
+                    pass.push_sql(" ?(@ == ");
+                    pass = push_json_value(pass, val)?;
+                    pass.push_sql(")");
+                }
+                SqlKeyword::NotEq => {
+                    pass.push_sql(" ?(@ != ");
+                    pass = push_json_value(pass, val)?;
+                    pass.push_sql(")");
+                }
+                SqlKeyword::Less => {}
+                SqlKeyword::Lte => {}
+                SqlKeyword::Greater => {}
+                SqlKeyword::Gte => {}
+                SqlKeyword::Like => {}
+                SqlKeyword::StartsWith => {}
+                SqlKeyword::Exists => {}
+            }
+        }
+        pass.push_sql("'");
+
+        Ok(())
+    }
+}
 
 fn query_builder_error(msg: &str) -> DieselError {
     DieselError::QueryBuilderError(Box::new(Error::new(msg.to_string())))
@@ -88,43 +118,9 @@ fn push_json_value<'a, 'b>(mut pass: AstPass<'a, 'b, Pg>, json_value: &'b Jsn) -
     Ok(pass)
 }
 
-impl QueryFragment<Pg> for StateSpec {
-    fn walk_ast<'b>(&'b self, mut pass: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
-        for (optic, cond) in &self.0 {
-            pass.push_sql("'");
-            pass.push_sql(optic.to_json_path_string().as_str());
-
-            for (kwd, val) in cond {
-                match kwd {
-                    SqlKeyword::Eq => {
-                        pass.push_sql(" ?(@ == ");
-                        pass = push_json_value(pass, val.into())?;
-                        pass.push_sql(")");
-                    }
-                    SqlKeyword::NotEq => {
-                        pass.push_sql(" ?(@ != ");
-                        pass = push_json_value(pass, val.into())?;
-                        pass.push_sql(")");
-                    }
-                    SqlKeyword::Less => {}
-                    SqlKeyword::Lte => {}
-                    SqlKeyword::Greater => {}
-                    SqlKeyword::Gte => {}
-                    SqlKeyword::Like => {}
-                    SqlKeyword::StartsWith => {}
-                    SqlKeyword::Exists => {}
-                }
-            }
-            pass.push_sql("'");
-        }
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod jsonb_tests {
-    use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, StateSpec};
+    use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, Predicate};
     use crate::model::sql_json::Keyword;
     use crate::schema::state::dsl::*;
     use crate::utils::js::optic::JsonOptic;
@@ -136,8 +132,9 @@ mod jsonb_tests {
 
     #[test]
     fn check_equals_spec_sql() {
-        let spec = serde_json::from_value::<HashMap<JsonOptic, HashMap<Keyword, Value>>>(json!({"a.b": {"==": 42}})).ok().unwrap();
-        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&StateSpec::from(spec)).into_sql::<JsonPath>()))).to_string();
+        let optic = JsonOptic::from_path("a.b");
+        let spec = serde_json::from_value::<HashMap<Keyword, Value>>(json!({"==": 42})).ok().unwrap();
+        let sql = debug_query::<Pg, _>(&state.filter(&data.exists((&Predicate::from(optic, spec)).into_sql::<JsonPath>()))).to_string();
         assert_eq!(sql, r#"SELECT "state"."id", "state"."created", "state"."data" FROM "state" WHERE "state"."data" @@ '$.a.b ?(@ == $1)' -- binds: [42]"#)
     }
 }
