@@ -7,12 +7,13 @@ use diesel_json::Json;
 
 #[derive(Clone)]
 pub struct AdminApiHandler {
-    stub_dao: StubDao
+    stub_dao: StubDao,
+    state_dao: StateDao
 }
 
 impl AdminApiHandler {
-    pub fn new(stub_dao: StubDao) -> AdminApiHandler {
-        AdminApiHandler { stub_dao }
+    pub fn new(stub_dao: StubDao, state_dao: StateDao) -> AdminApiHandler {
+        AdminApiHandler { stub_dao, state_dao }
     }
 
     pub async fn create_stub(&self, req_stub: CreateStubRequest) -> Result<bool, Error> {
@@ -34,5 +35,9 @@ impl AdminApiHandler {
         };
 
         self.stub_dao.insert_stub(new_stub).await.map(|res| res > 0)
+    }
+
+    pub async fn fetch_states(&self, request: SearchRequest) -> Result<Vec<persistent::State>, Error> {
+        self.state_dao.find_by_spec(request.query).await
     }
 }

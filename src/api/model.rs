@@ -26,3 +26,8 @@ pub struct CreateStubRequest {
     pub response: persistent::HttpStubResponse,
     pub callback: Option<persistent::Callback>
 }
+
+#[derive(Deserialize)]
+pub struct SearchRequest {
+    pub query: HashMap<JsonOptic, HashMap<JsonKeyword, Value>>
+}
