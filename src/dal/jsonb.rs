@@ -109,10 +109,16 @@ impl QueryFragment<Pg> for Predicate {
                     args.push(val);
                 }
                 SqlKeyword::Rx => {
+                    if !val.is_string() {
+                        return Err(query_builder_error("Incorrect argument for 'like_regex'"))
+                    }
                     pass.push_sql(" ?(@ like_regex %s)");
                     args.push(val);
                 }
                 SqlKeyword::StartsWith => {
+                    if !val.is_string() {
+                        return Err(query_builder_error("Incorrect argument for 'starts with'"))
+                    }
                     pass.push_sql(" ?(@ starts with %s)");
                     args.push(val);
                 }

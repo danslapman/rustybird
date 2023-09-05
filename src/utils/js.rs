@@ -35,6 +35,15 @@ pub enum Jsn {
     Object(HashMap<String, Jsn>),
 }
 
+impl Jsn {
+    pub fn is_string(&self) -> bool {
+        match self {
+            Jsn::String(_) => true,
+            _ => false
+        }
+    }
+}
+
 impl From<Value> for Jsn {
     fn from(value: Value) -> Self {
         match value {
