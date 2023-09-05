@@ -30,14 +30,16 @@ async fn main() -> std::io::Result<()> {
         .expect("Could not build connection pool");
 
     let stub_dao = StubDao::new(pool.clone());
+    let state_dao = StateDao::new(pool.clone());
 
-    let admin_api_handler = AdminApiHandler::new(stub_dao);
+    let admin_api_handler = AdminApiHandler::new(stub_dao, state_dao);
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(admin_api_handler.clone()))
             .service(api::exec_get)
             .service(api::exec_post)
+            .service(api::fetch_states)
             .service(api::create_stub)
     })
         .bind(("127.0.0.1", 8080))?

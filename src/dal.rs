@@ -73,6 +73,8 @@ impl StateDao {
             query = query.filter(data.exists(pred.into_sql::<JsonPath>()));
         }
 
+        //println!("{:#?}", diesel::query_builder::debug_query::<diesel::pg::Pg, _>(&query).to_string());
+
         let res = query.load(&mut conn)?;
 
         Ok(res)

@@ -29,7 +29,6 @@ pub enum Jsn {
     Null,
     Bool(bool),
     Signed(i64),
-    Unsigned(u64),
     Float(f64),
     String(String),
     Array(Vec<Jsn>),
@@ -42,7 +41,13 @@ impl From<Value> for Jsn {
             Value::Null => Jsn::Null,
             Value::Bool(boolean) => Jsn::Bool(boolean),
             Value::Number(n) if n.is_i64() => Jsn::Signed(n.as_i64().unwrap()),
-            Value::Number(n) if n.is_u64() => Jsn::Unsigned(n.as_u64().unwrap()),
+            Value::Number(n) if n.is_u64() => {
+                if n.as_u64().unwrap() <= i64::MAX as u64 {
+                    Jsn::Signed(n.as_u64().unwrap() as i64)
+                } else {
+                    Jsn::Float(n.as_f64().unwrap())
+                }
+            },
             Value::Number(n) if n.is_f64() => Jsn::Float(n.as_f64().unwrap()),
             Value::String(str) => Jsn::String(str),
             Value::Array(els) => Jsn::Array(els.iter().map(|el| el.clone().clone().into()).collect::<Vec<_>>()),
@@ -58,7 +63,6 @@ impl Display for Jsn {
             Jsn::Null => write!(fmt, "{}", "null"),
             Jsn::Bool(b) => write!(fmt, "{}", b),
             Jsn::Signed(i) => write!(fmt, "{}", i),
-            Jsn::Unsigned(u) => write!(fmt, "{}", u),
             Jsn::Float(f) => write!(fmt, "{}", f),
             Jsn::String(s) => write!(fmt, "\"{}\"", s.escape_default()),
             Jsn::Array(els) => write!(fmt, "{:?}", els),

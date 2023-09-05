@@ -138,7 +138,7 @@ pub enum Callback {
 }
 
 #[apply(NewInsertable!)]
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Serialize, QueryableByName)]
 #[diesel(table_name = crate::schema::state)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct State {
