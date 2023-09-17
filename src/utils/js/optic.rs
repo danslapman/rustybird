@@ -1,9 +1,9 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde_json::json;
 use serde_json::Value;
 use std::fmt::{Debug, Display, Formatter};
+use crate::utils::js::ValueExtInternal;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum PathPart {
@@ -128,18 +128,6 @@ impl <'de> Deserialize<'de> for JsonOptic {
     }
 }
 
-fn construct(part: &PathPart, value: Value) -> Value {
-    match part {
-        PathPart::Field(name) => json!({ name: value }),
-        PathPart::Index(idx) => {
-            let mut blank = vec![Value::Null; *idx];
-            blank.push(value);
-            Value::Array(blank)
-        }
-        PathPart::Traverse => json!([value]),
-    }
-}
-
 pub trait ValueExt {
     fn set(&mut self, optic: &JsonOptic, v: &Value);
     fn set_opt(&mut self, optic: &JsonOptic, v: Option<&Value>);
@@ -239,16 +227,12 @@ impl ValueExt for Value {
     }
 }
 
-trait ValueExtInternal {
+trait ValueExtSugar {
     fn modify_part_in_place(&mut self, part: &PathPart, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value);
     fn verify(&self, part: &PathPart) -> bool;
-    fn field(&self, field_name: &String) -> Option<&Value>;
-    fn at_index(&self, index: usize) -> Option<&Value>;
-    fn remove_field(&mut self, field_name: &String);
-    fn remove_at_index(&mut self, index: usize);
 }
 
-impl ValueExtInternal for Value {
+impl ValueExtSugar for Value {
     fn modify_part_in_place(
         &mut self,
         part: &PathPart,
@@ -256,83 +240,17 @@ impl ValueExtInternal for Value {
         default: impl Fn() -> Value,
     ) {
         match part {
-            PathPart::Field(name) => match self {
-                Value::Object(jo) => {
-                    if let Some(jv) = jo.get_mut(name) {
-                        modify(jv);
-                    } else {
-                        let mut new_val = default();
-                        modify(&mut new_val);
-                        jo.insert(name.clone(), new_val);
-                    }
-                }
-                _ => {
-                    let mut new_val = default();
-                    modify(&mut new_val);
-                    *self = construct(&part, new_val)
-                }
-            },
-            PathPart::Index(idx) => match self {
-                Value::Array(ja) => {
-                    if ja.len() <= *idx {
-                        let items_to_add = *idx - ja.len() + 1;
-                        ja.append(&mut vec![Value::Null; items_to_add]);
-                    }
-
-                    modify(ja.get_mut(*idx).unwrap())
-                }
-                _ => {
-                    let mut new_val = default();
-                    modify(&mut new_val);
-                    *self = construct(&part, new_val)
-                }
-            },
-            PathPart::Traverse => match self {
-                Value::Array(ja) => {
-                    for jv in ja.iter_mut() {
-                        modify(jv);
-                    }
-                }
-                _ => {
-                    let mut new_val = default();
-                    modify(&mut new_val);
-                    *self = construct(&part, new_val)
-                }
-            },
+            PathPart::Field(name) => self.modify_field_in_place(name, modify, default),
+            PathPart::Index(idx) => self.modify_position_in_place(*idx, modify, default),
+            PathPart::Traverse => self.traverse_in_place(modify, default),
         }
     }
 
     fn verify(&self, part: &PathPart) -> bool {
         match part {
-            PathPart::Field(name) => self.as_object().map(|m| m.contains_key(name)).unwrap_or(false),
-            PathPart::Index(idx) => self.as_array().map(|a| a.len() > *idx).unwrap_or(false),
+            PathPart::Field(name) => self.verify_field(name),
+            PathPart::Index(idx) => self.verify_position(*idx),
             PathPart::Traverse => self.is_array(),
-        }
-    }
-
-    fn field(&self, field_name: &String) -> Option<&Value> {
-        match self {
-            Value::Object(map) => map.get(field_name),
-            _ => None,
-        }
-    }
-
-    fn at_index(&self, index: usize) -> Option<&Value> {
-        match self {
-            Value::Array(vec) => vec.get(index),
-            _ => None,
-        }
-    }
-
-    fn remove_field(&mut self, field_name: &String) {
-        if let Some(jmap) = self.as_object_mut() {
-            jmap.remove(field_name);
-        }
-    }
-
-    fn remove_at_index(&mut self, index: usize) {
-        if let Some(jarr) = self.as_array_mut() {
-            jarr.remove(index);
         }
     }
 }
