@@ -1,6 +1,6 @@
 use crate::utils::{IntoBD, IntoUSize};
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive, Zero};
-use serde_json::{Number, Value};
+use serde_json::{Number, Value, json};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -89,6 +89,110 @@ impl Display for Jsn {
 impl Debug for Jsn {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "{}", self)
+    }
+}
+
+trait ValueExtInternal {
+    fn modify_field_in_place(&mut self, name: &String, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value);
+    fn modify_position_in_place(&mut self, index: usize, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value);
+    fn traverse_in_place(&mut self, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value);
+    fn verify_field(&self, name: &String) -> bool;
+    fn verify_position(&self, index: usize) -> bool;
+    fn field(&self, field_name: &String) -> Option<&Value>;
+    fn at_index(&self, index: usize) -> Option<&Value>;
+    fn remove_field(&mut self, field_name: &String);
+    fn remove_at_index(&mut self, index: usize);
+}
+
+impl ValueExtInternal for Value {
+    fn modify_field_in_place(&mut self, name: &String, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value) {
+        match self {
+            Value::Object(jo) => {
+                if let Some(jv) = jo.get_mut(name) {
+                    modify(jv);
+                } else {
+                    let mut new_val = default();
+                    modify(&mut new_val);
+                    jo.insert(name.clone(), new_val);
+                }
+            }
+            _ => {
+                let mut new_val = default();
+                modify(&mut new_val);
+                *self = json!({ name: new_val })
+            }
+        }
+    }
+
+    fn modify_position_in_place(&mut self, idx: usize, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value) {
+        match self {
+            Value::Array(ja) => {
+                if ja.len() <= idx {
+                    let items_to_add = idx - ja.len() + 1;
+                    ja.append(&mut vec![Value::Null; items_to_add]);
+                }
+
+                modify(ja.get_mut(idx).unwrap())
+            }
+            _ => {
+                let mut new_val = default();
+                modify(&mut new_val);
+
+                let mut blank = vec![Value::Null; idx];
+                blank.push(new_val);
+
+                *self = Value::Array(blank)
+            }
+        }
+    }
+
+    fn traverse_in_place(&mut self, modify: impl Fn(&mut Value) -> (), default: impl Fn() -> Value) {
+        match self {
+            Value::Array(ja) => {
+                for jv in ja.iter_mut() {
+                    modify(jv);
+                }
+            }
+            _ => {
+                let mut new_val = default();
+                modify(&mut new_val);
+                *self = json!([new_val])
+            }
+        }
+    }
+
+    fn verify_field(&self, name: &String) -> bool {
+        self.as_object().map(|m| m.contains_key(name)).unwrap_or(false)
+    }
+
+    fn verify_position(&self, idx: usize) -> bool {
+        self.as_array().map(|a| a.len() > idx).unwrap_or(false)
+    }
+
+    fn field(&self, field_name: &String) -> Option<&Value> {
+        match self {
+            Value::Object(map) => map.get(field_name),
+            _ => None,
+        }
+    }
+
+    fn at_index(&self, index: usize) -> Option<&Value> {
+        match self {
+            Value::Array(vec) => vec.get(index),
+            _ => None,
+        }
+    }
+
+    fn remove_field(&mut self, field_name: &String) {
+        if let Some(jmap) = self.as_object_mut() {
+            jmap.remove(field_name);
+        }
+    }
+
+    fn remove_at_index(&mut self, index: usize) {
+        if let Some(jarr) = self.as_array_mut() {
+            jarr.remove(index);
+        }
     }
 }
 
