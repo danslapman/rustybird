@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serde_json::Value;
+use serde_json::de;
+use serde_json::{Number, Value};
 use crate::utils::js::optic::{JsonOptic, ValueExt};
 
 static JSON_OPTIC_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\$([:~])?\{([\p{L}\d\.\[\]\-_]+)\}").unwrap());
@@ -21,7 +22,13 @@ impl JsonTemplater {
             let optic = JsonOptic::from_path(path);
 
             if self.values.validate(&optic) {
-                let new_value = self.values.get_all(&optic)[0].clone();
+                let mut new_value = self.values.get_all(&optic)[0].clone();
+
+                if modifier == Some(":") {
+                    new_value = cast_to_string(new_value);
+                } else if modifier == Some("~") {
+                    new_value = cast_from_string(new_value);
+                }
 
                 return Some(move |target: &mut Value| *target = new_value.clone())
             }
@@ -69,6 +76,26 @@ impl JsonTransformations for Value {
         };
 
         self.update_in_place_by_closure(&upd);
+    }
+}
+
+fn cast_to_string(value: Value) -> Value {
+    match value {
+        Value::Bool(bv) => Value::String(bv.to_string()),
+        Value::Number(nv) => Value::String(nv.to_string()),
+        other => other
+    }
+}
+
+fn cast_from_string(value: Value) -> Value {
+    match value {
+        Value::String(s) => match s.as_str() {
+            "true" => Value::Bool(true),
+            "false" => Value::Bool(false),
+            d if de::from_str::<'_, Number>(d).is_ok() => Value::Number(de::from_str(d).unwrap()),
+            _ => Value::String(s)
+        },
+        other => other
     }
 }
 
