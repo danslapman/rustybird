@@ -1,10 +1,24 @@
 use once_cell::sync::Lazy;
-use regex::Regex;
+use regex::{Captures, Regex};
 use serde_json::de;
 use serde_json::{Number, Value};
 use crate::utils::js::optic::{JsonOptic, ValueExt};
 
 static JSON_OPTIC_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\$([:~])?\{([\p{L}\d\.\[\]\-_]+)\}").unwrap());
+
+pub struct JsonPatcher {
+    new_value: Value
+}
+
+impl JsonPatcher {
+    fn new(new_value: Value) -> JsonPatcher {
+        JsonPatcher { new_value }
+    }
+
+    fn apply(&self, target: &mut Value) {
+        *target = self.new_value.clone()
+    }
+}
 
 pub struct JsonTemplater {
     values: Value
@@ -15,10 +29,16 @@ impl JsonTemplater {
         JsonTemplater { values }
     }
 
-    pub fn make_patcher_fn(&self, defn: &str) -> Option<impl Fn(&mut Value)> {
-        if let Some(caps) = JSON_OPTIC_PATTERN.captures(defn) {
-            let modifier = caps.get(1).map(|m| m.as_str());
-            let path = &caps[2];
+    pub fn make_patcher_fn<'l>(&'l self, defn: &'l str) -> Option<JsonPatcher> {
+        let captures = JSON_OPTIC_PATTERN.captures_iter(defn).collect::<Vec<_>>();
+
+        if captures.is_empty() {
+            return None;
+        }
+
+        if let [cap] = &captures[..] {
+            let modifier = cap.get(1).map(|m| m.as_str());
+            let path = &cap[2];
             let optic = JsonOptic::from_path(path);
 
             if self.values.validate(&optic) {
@@ -30,8 +50,20 @@ impl JsonTemplater {
                     new_value = cast_from_string(new_value);
                 }
 
-                return Some(move |target: &mut Value| *target = new_value.clone())
+                return Some(JsonPatcher::new(new_value))
             }
+        } else {
+            let replacement = |caps: &Captures| -> String {
+                let path = &caps[2];
+                let optic = JsonOptic::from_path(path);
+
+                let str_value = self.values.get_all(&optic).first().map(|v| render_subst(v));
+                str_value.unwrap_or(path.to_string())
+            };
+
+            return Some(JsonPatcher::new(Value::String(
+                JSON_OPTIC_PATTERN.replace_all(defn.clone(), replacement).to_string()
+            )))
         }
 
         None
@@ -65,10 +97,10 @@ impl JsonTransformations for Value {
         let templater = JsonTemplater::new(values);
 
         let upd = |vx: &mut Value| {
-            match vx {
+            match &vx {
                 Value::String(s) => {
                     if let Some(patcher) = templater.make_patcher_fn(&s) {
-                        patcher(vx)
+                        patcher.apply(vx)
                     }
                 },
                 _ => ()
@@ -99,6 +131,17 @@ fn cast_from_string(value: Value) -> Value {
     }
 }
 
+fn render_subst(value: &Value) -> String {
+    match value {
+        Value::Null => "null".to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => s.clone(),
+        Value::Array(vs) => vs.iter().map(|j| render_subst(j)).collect::<Vec<_>>().join(", "),
+        _ => serde_json::to_string(value).unwrap()
+    }
+}
+
 #[cfg(test)]
 mod json_templater_tests {
     use serde_json::{json, Value};
@@ -113,6 +156,7 @@ mod json_templater_tests {
             "meta" : {
                 "field1" : "${extras.fields.[0]}"
             },
+            "composite": "${extras.topic}: ${description}"
         });
 
         let data: Value = json!({
@@ -126,15 +170,17 @@ mod json_templater_tests {
 
         template.substitute_in_place(data);
 
-        assert_eq!(template,
-                   json!({
-                       "description": "Some description",
-                       "topic" : "Main topic",
-                       "comment" : "First nah!",
-                       "meta" : {
-                           "field1": "f1"
-                       }
-        }))
+        assert_eq!(template, json!(
+            {
+               "description": "Some description",
+               "topic" : "Main topic",
+               "comment" : "First nah!",
+               "meta" : {
+                   "field1": "f1"
+               },
+               "composite" : "Main topic: Some description"
+            }
+        ))
     }
 
     #[test]
