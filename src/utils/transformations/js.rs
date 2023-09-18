@@ -14,7 +14,7 @@ impl JsonTemplater {
         JsonTemplater { values }
     }
 
-    pub fn make_patcher(&self, defn: &str) -> Option<JsonPatcher> {
+    pub fn make_patcher_fn(&self, defn: &str) -> Option<impl Fn(&mut Value)> {
         if let Some(caps) = JSON_OPTIC_PATTERN.captures(defn) {
             let modifier = caps.get(1).map(|m| m.as_str());
             let path = &caps[2];
@@ -23,25 +23,11 @@ impl JsonTemplater {
             if self.values.validate(&optic) {
                 let new_value = self.values.get_all(&optic)[0].clone();
 
-                return Some(JsonPatcher::new(new_value))
+                return Some(move |target: &mut Value| *target = new_value.clone())
             }
         }
 
         None
-    }
-}
-
-pub struct JsonPatcher {
-    new_value: Value
-}
-
-impl JsonPatcher {
-    pub fn new(new_value: Value) -> JsonPatcher {
-        JsonPatcher { new_value }
-    }
-
-    pub fn patch(&self, target: &mut Value) {
-        *target = self.new_value.clone()
     }
 }
 
@@ -74,8 +60,8 @@ impl JsonTransformations for Value {
         let upd = |vx: &mut Value| {
             match vx {
                 Value::String(s) => {
-                    if let Some(patcher) = templater.make_patcher(&s) {
-                        patcher.patch(vx)
+                    if let Some(patcher) = templater.make_patcher_fn(&s) {
+                        patcher(vx)
                     }
                 },
                 _ => ()
