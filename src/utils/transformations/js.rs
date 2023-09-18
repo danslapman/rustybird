@@ -136,4 +136,96 @@ mod json_templater_tests {
                        }
         }))
     }
+
+    #[test]
+    fn absent_fields_should_be_ignored() {
+        let mut template: Value = json!(
+            {
+                "value": "${description}"
+            }
+        );
+
+        let data: Value = json!({});
+
+        template.substitute_in_place(data);
+
+        assert_eq!(template, json!({"value": "${description}"}))
+    }
+
+    #[test]
+    fn substitution_of_object() {
+        let mut template: Value = json!(
+            {
+                "value": "${message}"
+            }
+        );
+
+        let data: Value = json!(
+            {
+                "message": {"peka": "name"}
+            }
+        );
+
+        template.substitute_in_place(data);
+
+        assert_eq!(template, json!({"value": {"peka": "name"}}))
+    }
+
+    #[test]
+    fn convert_to_a_string() {
+        let mut template: Value = json!(
+            {
+                "a": "$:{b1}",
+                "b" : "$:{b2}",
+                "c" : "$:{n}"
+            }
+        );
+
+        let data: Value = json!(
+            {
+                "b1" : true,
+                "b2" : false,
+                "n" : 45.99
+            }
+        );
+
+        template.substitute_in_place(data);
+
+        assert_eq!(template, json!(
+            {
+                "a" : "true",
+                "b" : "false",
+                "c" : "45.99"
+            }
+        ))
+    }
+
+    #[test]
+    fn convert_from_string() {
+        let mut template: Value = json!(
+            {
+                "a": "$~{b1}",
+                "b" : "$~{b2}",
+                "c" : "$~{n}"
+            }
+        );
+
+        let data: Value = json!(
+            {
+                "b1" : "true",
+                "b2" : "false",
+                "n" : "45.99"
+            }
+        );
+
+        template.substitute_in_place(data);
+
+        assert_eq!(template, json!(
+            {
+                "a" : true,
+                "b" : false,
+                "c" : 45.99
+            }
+        ))
+    }
 }
