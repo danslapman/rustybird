@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde_json::de;
 use serde_json::{Number, Value};
+use std::collections::HashMap;
 use crate::utils::js::optic::{JsonOptic, ValueExt};
 
 static JSON_OPTIC_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\$([:~])?\{([\p{L}\d\.\[\]\-_]+)\}").unwrap());
@@ -62,7 +63,7 @@ impl JsonTemplater {
             };
 
             return Some(JsonPatcher::new(Value::String(
-                JSON_OPTIC_PATTERN.replace_all(defn.clone(), replacement).to_string()
+                JSON_OPTIC_PATTERN.replace_all(defn, replacement).to_string()
             )))
         }
 
@@ -74,6 +75,7 @@ pub trait JsonTransformations {
     fn update_in_place_by_fn(&mut self, modify: fn(&mut Value));
     fn update_in_place_by_closure(&mut self, modify: &dyn Fn(&mut Value));
     fn substitute_in_place(&mut self, values: Value);
+    fn patch_in_place(&mut self, values: Value, schema: HashMap<JsonOptic, String>);
 }
 
 impl JsonTransformations for Value {
@@ -108,6 +110,18 @@ impl JsonTransformations for Value {
         };
 
         self.update_in_place_by_closure(&upd);
+    }
+
+    fn patch_in_place(&mut self, values: Value, schema: HashMap<JsonOptic, String>) {
+        let templater = JsonTemplater::new(values);
+
+        for (optic, defn) in schema {
+            if let Some(patcher) = templater.make_patcher_fn(&defn) {
+                let mut new_value = Value::Null;
+                patcher.apply(&mut new_value);
+                self.set(&optic, &new_value);
+            }
+        }
     }
 }
 
@@ -273,5 +287,34 @@ mod json_templater_tests {
                 "c" : 45.99
             }
         ))
+    }
+
+    #[test]
+    fn json_patcher() {
+        let mut target: Value = json!(
+            {
+                "f1" : "v1",
+                "a2" : ["e1", "e2", "e3"],
+                "o3" : {}
+            }
+        );
+
+        let source: Value = json!(
+            {
+                "name" : "Peka",
+                "surname" : "Kekovsky",
+                "comment" : "nondesc"
+            }
+        );
+
+        let schema = HashMap::from([
+            (JsonOptic::from_path("a2.[4]"), "${comment}".to_string()),
+            (JsonOptic::from_path("o3.client"), "${name} ${surname}".to_string())
+        ]);
+
+        target.patch_in_place(source, schema);
+
+        assert_eq!(target.get_all(&JsonOptic::from_path("a2.[4]")), vec![&Value::String("nondesc".to_string())]);
+        assert_eq!(target.get_all(&JsonOptic::from_path("o3.client")), vec![&Value::String("Peka Kekovsky".to_string())]);
     }
 }
