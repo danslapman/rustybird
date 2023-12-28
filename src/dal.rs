@@ -1,11 +1,10 @@
 use crate::dal::jsonb::{JsonPath, JsonbQueryMethods, Predicate};
 use crate::error::Error;
 use crate::model::persistent::*;
-use crate::model::sql_json::{Keyword as SqlKeyword};
+use crate::model::sql_json::Keyword as SqlKeyword;
 use crate::utils::js::optic::JsonOptic;
 use chrono::Utc;
 use diesel::prelude::*;
-use diesel::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 use serde_json::Value;
 use std::collections::HashMap;

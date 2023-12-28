@@ -5,7 +5,10 @@ use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::Pool;
 use dotenvy::dotenv;
+use structured_logger::Builder;
+use structured_logger::json::new_writer;
 use std::env;
+use std::io::stdout;
 
 #[macro_use]
 extern crate diesel_autoincrement_new_struct;
@@ -21,6 +24,10 @@ pub mod utils;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().expect(".env file not found");
+
+    Builder::with_level("debug")
+        .with_target_writer("*", new_writer(stdout()))
+        .init();
 
     let db_uri = env::var("DATABASE_URL").expect("Database url not defined");
     let manager = ConnectionManager::<PgConnection>::new(db_uri);

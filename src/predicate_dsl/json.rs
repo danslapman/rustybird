@@ -44,6 +44,10 @@ impl JsonPredicate {
         }
     }
 
+    pub fn from_spec(spec: Spec) -> JsonPredicate {
+        JsonPredicate { definition: spec }
+    }
+
     fn validate_one<'r>(kwd: &'r Keyword, etalon: &'r Value, value: &Value) -> Result<bool, ValidationError<'r>> {
         match (kwd, etalon, value) {
             (Keyword::Equals, v_eq, val) => Ok(v_eq == val),

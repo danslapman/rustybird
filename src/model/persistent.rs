@@ -44,6 +44,38 @@ pub enum HttpStubRequest {
     }
 }
 
+impl HttpStubRequest {
+    pub fn check_headers(&self, hs: HashMap<String, String>) -> bool {
+        self.headers().iter().all(|(k, v)| hs.get(k).is_some_and(|vx| vx.to_lowercase() == v.to_lowercase()))
+    }
+
+    pub fn check_query_params(&self, params: Value) -> bool {
+        if self.query().is_empty() {
+            true
+        } else {
+            JsonPredicate::from_spec(self.query().clone()).validate(params).unwrap_or(false)
+        }
+    }
+
+    fn headers(&self) -> &HashMap<String, String> {
+        match self {
+            HttpStubRequest::RequestWithoutBody { headers, .. } => headers,
+            HttpStubRequest::JsonRequest { headers, .. } => headers,
+            HttpStubRequest::RawRequest { headers, .. } => headers,
+            HttpStubRequest::JLensRequest { headers, .. } => headers,
+        }
+    }
+
+    fn query(&self) -> &HashMap<JsonOptic, HashMap<Keyword, Value>> {
+        match self {
+            HttpStubRequest::RequestWithoutBody { query, .. } => query,
+            HttpStubRequest::JsonRequest { query, .. } => query,
+            HttpStubRequest::RawRequest { query, .. } => query,
+            HttpStubRequest::JLensRequest { query, .. } => query,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "mode")]
 pub enum HttpStubResponse {

@@ -1,9 +1,10 @@
 use crate::api::model::*;
 use crate::api::admin::AdminApiHandler;
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder, HttpRequest};
 use serde::Deserialize;
 
 pub mod admin;
+pub mod exec;
 pub mod model;
 pub mod resolver;
 
@@ -13,8 +14,8 @@ pub struct PathInfo {
 }
 
 #[get("/api/rustybird/exec/{path:.*}")]
-pub async fn exec_get(path: web::Path<PathInfo>) -> impl Responder {
-    HttpResponse::Ok().body(format!("{}", path.path))
+pub async fn exec_get(req: HttpRequest) -> impl Responder {
+    HttpResponse::Ok().body(format!("{}", req.path()))
 }
 
 #[post("/api/rustybird/exec/{path:.*}")]

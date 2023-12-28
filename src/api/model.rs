@@ -2,7 +2,7 @@ use crate::model::*;
 use crate::model::sql_json::Keyword as JsonKeyword;
 use crate::utils::js::optic::JsonOptic;
 use regex::Regex;
-use serde::{Deserialize};
+use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 
