@@ -1,3 +1,4 @@
+use crate::api::model::RequestBody;
 use crate::model::*;
 use crate::model::sql_json::Keyword as SqlKeyword;
 use crate::predicate_dsl::json::JsonPredicate;
@@ -54,6 +55,33 @@ impl HttpStubRequest {
             true
         } else {
             JsonPredicate::from_spec(self.query().clone()).validate(params).unwrap_or(false)
+        }
+    }
+
+    pub fn check_body(&self, r_body: RequestBody) -> bool {
+        match self {
+            HttpStubRequest::RequestWithoutBody { .. } =>
+                match r_body {
+                    RequestBody::AbsentRequestBody => true,
+                    _ => false
+                },
+            HttpStubRequest::JsonRequest { body, .. } =>
+                self.extract_json(r_body).map_or(false, |jx| &jx == body),
+            HttpStubRequest::RawRequest { body, .. } =>
+                match r_body {
+                    RequestBody::SimpleRequestBody { value } => &value == body,
+                    _ => false
+                },
+            HttpStubRequest::JLensRequest { body, .. } =>
+                self.extract_json(r_body).and_then(|jx| body.validate(jx).ok()).unwrap_or(false)
+        }
+    }
+
+    pub fn extract_json(&self, r_body: RequestBody) -> Option<Value> {
+        match (self, r_body) {
+            (HttpStubRequest::JsonRequest { .. } | HttpStubRequest::JLensRequest { .. }, RequestBody::SimpleRequestBody { value }) =>
+                serde_json::from_str(&value).ok(),
+            _ => None
         }
     }
 

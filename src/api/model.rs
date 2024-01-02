@@ -31,3 +31,11 @@ pub struct CreateStubRequest {
 pub struct SearchRequest {
     pub query: HashMap<JsonOptic, HashMap<JsonKeyword, Value>>
 }
+
+#[derive(Clone)]
+pub enum RequestBody {
+    AbsentRequestBody,
+    SimpleRequestBody {
+        value: String
+    }
+}

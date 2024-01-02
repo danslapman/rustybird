@@ -1,10 +1,11 @@
 use crate::model::*;
+use crate::api::model::RequestBody;
 use crate::error::Error;
 use crate::model::persistent::HttpStub;
 use crate::utils::pg::*;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use log::{info, warn};
+use log::info;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -14,7 +15,7 @@ pub struct StubResolver {
 }
 
 impl StubResolver {
-    fn find_stub_and_state(&self, in_scope: Scope, with_method: HttpMethod, with_path: String, with_headers: HashMap<String, String>, query_object: Value) -> Result<Option<HttpStub>, Error> {
+    fn find_stub_and_state(&self, in_scope: Scope, with_method: HttpMethod, with_path: String, with_headers: HashMap<String, String>, query_object: Value, body: RequestBody) -> Result<Option<HttpStub>, Error> {
         use crate::schema::stub::dsl::*;
 
         let mut conn = self.pool.get()?;
@@ -42,7 +43,25 @@ impl StubResolver {
             return Err(Error::new(format!("There are no {:?} candidates in scope {:?} after query parameters check", path, scope)));
         }
 
-        info!("Candidates for {:?} in {:?} after query parameters check are: {:?}", path, scope, candidates1.iter().map(|c| c.id).collect::<Vec<_>>());
+        info!("After query parameters check: {:?}", candidates1.iter().map(|c| c.id).collect::<Vec<_>>());
+
+        let candidates2 = candidates1.into_iter().filter(|s| s.request.0.check_headers(with_headers.clone())).collect::<Vec<_>>();
+
+        if candidates2.is_empty() {
+            info!("There are no {:?} candidates in scope {:?} after headers check", path, scope);
+            return Err(Error::new(format!("There are no {:?} candidates in scope {:?} after headers check", path, scope)));
+        }
+
+        info!("After headers check: {:?}", candidates2.iter().map(|c| c.id).collect::<Vec<_>>());
+
+        let candidates3 = candidates2.into_iter().filter(|s| s.request.0.check_body(body.clone())).collect::<Vec<_>>();
+
+        if candidates3.is_empty() {
+            info!("There are no {:?} candidates in scope {:?} after body check", path, scope);
+            return Err(Error::new(format!("There are no {:?} candidates in scope {:?} after body check", path, scope)));
+        }
+
+        info!("After body check: {:?}", candidates3.iter().map(|c| c.id).collect::<Vec<_>>());
 
         Ok(None)
     }
